@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vinoteca IA — Sumiller Digital</title>
+<style>
+  :root {
+    --wine: #6b1428;
+    --wine-dark: #3d0a18;
+    --wine-pale: #f5eaed;
+    --gold: #c08020;
+    --gold-pale: #fdf4e0;
+    --ink: #1a1208;
+    --paper: #f8f2e8;
+    --cream: #fdfaf5;
+    --earth: #7a5c38;
+    --sage: #2d5c3a;
+    --sage-pale: #eaf4ec;
+    --border: rgba(107,20,40,0.15);
+    --mono: 'JetBrains Mono', 'Fira Code', monospace;
+    --serif: Georgia, serif;
+    --sans: system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--wine-dark);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  }
+  .logo {
+    font-family: var(--serif);
+    font-size: 22px;
+    font-weight: 700;
+    color: #fdfaf5;
+    letter-spacing: -0.3px;
+  }
+  .logo span { color: var(--gold); font-style: italic; }
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--sage);
+    display: inline-block;
+    margin-right: 6px;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .status-label {
+    font-size: 12px;
+    color: rgba(253,250,245,0.6);
+    font-family: var(--mono);
+  }
+
+  /* ── CHAT AREA ── */
+  #chat {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    scroll-behavior: smooth;
+  }
+
+  /* ── MESSAGES ── */
+  .msg {
+    display: flex;
+    flex-direction: column;
+    max-width: 78%;
+    gap: 4px;
+  }
+  .msg-user { align-self: flex-end; align-items: flex-end; }
+  .msg-agent { align-self: flex-start; align-items: flex-start; }
+
+  .bubble {
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: 14.5px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .bubble-user {
+    background: var(--wine);
+    color: #fdfaf5;
+    border-radius: 12px 12px 2px 12px;
+  }
+  .bubble-agent {
+    background: var(--cream);
+    color: var(--ink);
+    border: 1px solid var(--border);
+    border-radius: 12px 12px 12px 2px;
+  }
+  .msg-time {
+    font-size: 11px;
+    color: #b8a88a;
+    font-family: var(--mono);
+  }
+
+  /* ── THINKING BLOCK ── */
+  .thinking-block {
+    background: var(--gold-pale);
+    border: 1px solid rgba(192,128,32,0.2);
+    border-left: 3px solid var(--gold);
+    border-radius: 0 8px 8px 0;
+    padding: 10px 14px;
+    font-size: 12.5px;
+    color: #6a4a10;
+    font-style: italic;
+    max-width: 78%;
+    align-self: flex-start;
+  }
+  .thinking-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--gold);
+    display: block;
+    margin-bottom: 4px;
+    font-style: normal;
+  }
+
+  /* ── APPROVE CARD ── */
+  .approve-card {
+    background: var(--sage-pale);
+    border: 1px solid rgba(45,92,58,0.25);
+    border-radius: 12px;
+    padding: 18px 20px;
+    max-width: 78%;
+    align-self: flex-start;
+  }
+  .approve-title {
+    font-family: var(--serif);
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--sage);
+    margin-bottom: 10px;
+  }
+  .approve-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .btn {
+    padding: 9px 20px;
+    border-radius: 8px;
+    font-size: 13.5px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: opacity 0.15s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn:disabled { opacity: 0.5; cursor: default; }
+  .btn-confirm { background: var(--sage); color: white; }
+  .btn-cancel { background: var(--wine-pale); color: var(--wine); border: 1px solid var(--border); }
+
+  /* ── INPUT AREA ── */
+  #input-area {
+    border-top: 1px solid var(--border);
+    padding: 16px 24px;
+    background: var(--cream);
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+  }
+  #user-input {
+    flex: 1;
+    padding: 12px 16px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 14.5px;
+    font-family: inherit;
+    background: white;
+    color: var(--ink);
+    resize: none;
+    min-height: 46px;
+    max-height: 120px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  #user-input:focus { border-color: var(--wine); }
+  #send-btn {
+    background: var(--wine);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    min-width: 72px;
+    transition: background 0.15s;
+  }
+  #send-btn:hover { background: var(--wine-dark); }
+  #send-btn:disabled { background: #c0a0a8; cursor: default; }
+
+  /* ── TYPING INDICATOR ── */
+  .typing {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--cream);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    width: fit-content;
+  }
+  .typing-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--earth);
+    animation: bounce 1.2s infinite;
+  }
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce {
+    0%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-6px); }
+  }
+
+  /* ── SCROLLBAR ── */
+  #chat::-webkit-scrollbar { width: 6px; }
+  #chat::-webkit-scrollbar-track { background: transparent; }
+  #chat::-webkit-scrollbar-thumb { background: rgba(107,20,40,0.2); border-radius: 3px; }
+
+  /* ── WELCOME ── */
+  .welcome {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--earth);
+  }
+  .welcome h2 {
+    font-family: var(--serif);
+    font-size: 26px;
+    color: var(--wine);
+    margin-bottom: 8px;
+    font-style: italic;
+  }
+  .welcome p { font-size: 14px; line-height: 1.6; max-width: 400px; margin: 0 auto 20px; }
+  .suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 16px;
+  }
+  .suggestion-chip {
+    background: var(--wine-pale);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 7px 14px;
+    font-size: 13px;
+    color: var(--wine);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .suggestion-chip:hover { background: #eacccc; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Vinoteca <span>IA</span></div>
+  <div>
+    <span class="status-dot" id="status-dot"></span>
+    <span class="status-label" id="status-label">conectando...</span>
+  </div>
+</header>
+
+<div id="chat">
+  <div class="welcome" id="welcome">
+    <h2>El Sumiller Digital</h2>
+    <p>Contame qué ocasión tenés en mente, con qué comida querés maridar, o preguntame directamente sobre cualquier vino de nuestro catálogo.</p>
+    <div class="suggestions">
+      <div class="suggestion-chip" onclick="usar_sugerencia(this)">Quiero algo para regalar</div>
+      <div class="suggestion-chip" onclick="usar_sugerencia(this)">¿Qué va bien con cordero?</div>
+      <div class="suggestion-chip" onclick="usar_sugerencia(this)">Busco un Malbec de Valle de Uco</div>
+      <div class="suggestion-chip" onclick="usar_sugerencia(this)">¿Cuánto sale el Zuccardi?</div>
+      <div class="suggestion-chip" onclick="usar_sugerencia(this)">Quiero comprar 2 botellas</div>
+    </div>
+  </div>
+</div>
+
+<div id="input-area">
+  <textarea
+    id="user-input"
+    placeholder="Escribí tu consulta..."
+    rows="1"
+    onkeydown="handle_key(event)"
+    oninput="auto_resize(this)"
+  ></textarea>
+  <button id="send-btn" onclick="enviar()">Enviar</button>
+</div>
+
+<script>
+  const API_URL = '';
+  const TOKEN = 'token_web_dev';
+  let session_id = null;
+  let pedido_pendiente_id = null;
+  let esperando = false;
+
+  // Verificar health al cargar
+  fetch('/health')
+    .then(r => r.json())
+    .then(d => {
+      document.getElementById('status-dot').style.background =
+        d.status === 'ok' ? '#2d5c3a' : '#c08020';
+      document.getElementById('status-label').textContent =
+        d.status === 'ok' ? 'en línea' : 'degradado';
+    })
+    .catch(() => {
+      document.getElementById('status-dot').style.background = '#9b2040';
+      document.getElementById('status-label').textContent = 'sin conexión';
+    });
+
+  function usar_sugerencia(el) {
+    document.getElementById('user-input').value = el.textContent;
+    enviar();
+  }
+
+  function auto_resize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  }
+
+  function handle_key(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      enviar();
+    }
+  }
+
+  function ahora() {
+    return new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function agregar_msg_usuario(texto) {
+    ocultar_bienvenida();
+    const chat = document.getElementById('chat');
+    const div = document.createElement('div');
+    div.className = 'msg msg-user';
+    div.innerHTML = `
+      <div class="bubble bubble-user">${escapar(texto)}</div>
+      <div class="msg-time">${ahora()}</div>
+    `;
+    chat.appendChild(div);
+    scroll_abajo();
+  }
+
+  function agregar_msg_agente(texto, agente) {
+    const chat = document.getElementById('chat');
+    const div = document.createElement('div');
+    div.className = 'msg msg-agent';
+    const label = agente ? `<div class="msg-time">${agente} · ${ahora()}</div>` : `<div class="msg-time">${ahora()}</div>`;
+    div.innerHTML = `
+      <div class="bubble bubble-agent">${renderizar_markdown(texto)}</div>
+      ${label}
+    `;
+    chat.appendChild(div);
+    scroll_abajo();
+    return div;
+  }
+
+  function agregar_thinking(texto) {
+    const chat = document.getElementById('chat');
+    const div = document.createElement('div');
+    div.className = 'thinking-block';
+    div.innerHTML = `<span class="thinking-label">Procesando</span>${escapar(texto)}`;
+    chat.appendChild(div);
+    scroll_abajo();
+    return div;
+  }
+
+  function mostrar_typing() {
+    const chat = document.getElementById('chat');
+    const div = document.createElement('div');
+    div.id = 'typing-indicator';
+    div.innerHTML = `
+      <div class="typing">
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+      </div>
+    `;
+    chat.appendChild(div);
+    scroll_abajo();
+  }
+
+  function ocultar_typing() {
+    const el = document.getElementById('typing-indicator');
+    if (el) el.remove();
+  }
+
+  function mostrar_card_aprobacion(pedido_id, mensaje) {
+    const chat = document.getElementById('chat');
+    const div = document.createElement('div');
+    div.className = 'approve-card';
+    div.id = 'approve-card';
+    div.innerHTML = `
+      <div class="approve-title">Confirmar pedido</div>
+      <div style="font-size:13.5px;color:#2d5c3a;line-height:1.6">${renderizar_markdown(mensaje)}</div>
+      <div class="approve-actions">
+        <button class="btn btn-confirm" onclick="confirmar_pedido('${pedido_id}')">Confirmar y pagar</button>
+        <button class="btn btn-cancel" onclick="cancelar_pedido('${pedido_id}')">Cancelar</button>
+      </div>
+    `;
+    chat.appendChild(div);
+    scroll_abajo();
+  }
+
+  async function confirmar_pedido(pedido_id) {
+    const card = document.getElementById('approve-card');
+    if (card) card.querySelectorAll('.btn').forEach(b => b.disabled = true);
+
+    mostrar_typing();
+    try {
+      const resp = await fetch(`/pedido/${pedido_id}/aprobar`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Channel-Token': TOKEN,
+        },
+        body: JSON.stringify({ aprobado: true }),
+      });
+      const data = await resp.json();
+      ocultar_typing();
+      if (card) card.remove();
+
+      if (data.ok && data.url_pago) {
+        agregar_msg_agente(
+          `Pedido confirmado. Total: $${data.total?.toLocaleString('es-AR') || ''}.\n\n[Ir al pago →](${data.url_pago})`,
+          'pedidos'
+        );
+      } else {
+        agregar_msg_agente(data.mensaje || 'Pedido procesado.', 'pedidos');
+      }
+    } catch (e) {
+      ocultar_typing();
+      agregar_msg_agente('Ocurrió un error al confirmar. Por favor intentá de nuevo.', 'sistema');
+    }
+    pedido_pendiente_id = null;
+  }
+
+  async function cancelar_pedido(pedido_id) {
+    const card = document.getElementById('approve-card');
+    if (card) card.querySelectorAll('.btn').forEach(b => b.disabled = true);
+
+    try {
+      await fetch(`/pedido/${pedido_id}/aprobar`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Channel-Token': TOKEN,
+        },
+        body: JSON.stringify({ aprobado: false }),
+      });
+    } catch (_) {}
+
+    if (card) card.remove();
+    agregar_msg_agente('Pedido cancelado. ¿Puedo ayudarte con algo más?', 'asistente');
+    pedido_pendiente_id = null;
+  }
+
+  async function enviar() {
+    if (esperando) return;
+    const input = document.getElementById('user-input');
+    const texto = input.value.trim();
+    if (!texto) return;
+
+    input.value = '';
+    input.style.height = 'auto';
+    document.getElementById('send-btn').disabled = true;
+    esperando = true;
+
+    agregar_msg_usuario(texto);
+    mostrar_typing();
+
+    try {
+      const body = { mensaje: texto };
+      if (session_id) body.session_id = session_id;
+
+      const resp = await fetch('/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Channel-Token': TOKEN,
+        },
+        body: JSON.stringify(body),
+      });
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      ocultar_typing();
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lineas = buffer.split('\n');
+        buffer = lineas.pop();
+
+        for (const linea of lineas) {
+          if (!linea.startsWith('data: ')) continue;
+          const raw = linea.slice(6).trim();
+          if (raw === '[DONE]') continue;
+
+          try {
+            const data = JSON.parse(raw);
+            if (!session_id) session_id = data.session_id;
+
+            if (data.respuesta) {
+              agregar_msg_agente(data.respuesta, data.agente);
+            }
+
+            if (data.requiere_aprobacion && data.pedido_id) {
+              pedido_pendiente_id = data.pedido_id;
+              mostrar_card_aprobacion(data.pedido_id, data.respuesta || 'Por favor confirmá tu pedido.');
+            }
+          } catch (_) {}
+        }
+      }
+    } catch (e) {
+      ocultar_typing();
+      agregar_msg_agente('Error de conexión. Por favor intentá de nuevo.', 'sistema');
+    }
+
+    esperando = false;
+    document.getElementById('send-btn').disabled = false;
+    document.getElementById('user-input').focus();
+  }
+
+  function ocultar_bienvenida() {
+    const el = document.getElementById('welcome');
+    if (el) el.style.display = 'none';
+  }
+
+  function scroll_abajo() {
+    const chat = document.getElementById('chat');
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  function escapar(str) {
+    return str.replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;');
+  }
+
+  function renderizar_markdown(texto) {
+    return texto
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank" rel="noopener" style="color:#6b1428">$1</a>')
+      .replace(/^#{1,3}\s+(.+)$/gm, '<strong>$1</strong>')
+      .replace(/\n/g, '<br>');
+  }
+</script>
+</body>
+</html>

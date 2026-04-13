@@ -1,0 +1,1457 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Knowledge Pipeline — El Sumiller que Aprende</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --void: #0d0a06;
+  --deep: #1a1208;
+  --dark: #2a1f10;
+  --mid: #4a3820;
+  --earth: #7a5c38;
+  --tan: #b89060;
+  --straw: #d4b080;
+  --parch: #f0e4cc;
+  --paper: #f8f2e8;
+  --white: #fdfaf5;
+
+  --wine-deep: #3d0a18;
+  --wine: #6b1428;
+  --wine-bright: #9b2040;
+  --wine-pale: #f0dde2;
+  --wine-ghost: #faf2f4;
+
+  --gold-deep: #5a3a00;
+  --gold: #c08020;
+  --gold-bright: #e0a030;
+  --gold-pale: #fdf0d0;
+
+  --sage-deep: #1a3020;
+  --sage: #2d5c3a;
+  --sage-bright: #4a8c5a;
+  --sage-pale: #e8f4ec;
+
+  --slate-deep: #0a1828;
+  --slate: #1a3048;
+  --slate-bright: #2a5080;
+  --slate-pale: #e0eaf4;
+
+  --border-fine: rgba(122,92,56,0.15);
+  --border-mid: rgba(122,92,56,0.25);
+  --border-strong: rgba(122,92,56,0.4);
+
+  --ff-display: 'Cormorant Garamond', Georgia, serif;
+  --ff-body: 'Outfit', sans-serif;
+  --ff-mono: 'JetBrains Mono', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--paper);
+  color: var(--deep);
+  font-family: var(--ff-body);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+/* ── PORTADA ─────────────────────────────── */
+.cover {
+  background: var(--void);
+  min-height: 420px;
+  padding: 72px 64px 64px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.cover-bg-lines {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(192,128,32,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(192,128,32,0.04) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+.cover-circle {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid rgba(192,128,32,0.12);
+}
+.cover-kicker {
+  font-family: var(--ff-mono);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--gold-bright);
+  margin-bottom: 24px;
+  position: relative;
+}
+.cover h1 {
+  font-family: var(--ff-display);
+  font-size: 60px;
+  font-weight: 300;
+  line-height: 1.08;
+  color: var(--white);
+  max-width: 680px;
+  margin-bottom: 20px;
+  position: relative;
+}
+.cover h1 em {
+  font-style: italic;
+  color: var(--gold-bright);
+}
+.cover-sub {
+  font-size: 16px;
+  color: rgba(253,250,245,0.5);
+  max-width: 560px;
+  line-height: 1.65;
+  font-weight: 300;
+  position: relative;
+  margin-bottom: 52px;
+}
+.cover-pills {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  position: relative;
+}
+.cover-pill {
+  border: 1px solid rgba(192,128,32,0.3);
+  border-radius: 100px;
+  padding: 5px 16px;
+  font-size: 12px;
+  color: rgba(253,250,245,0.6);
+  font-family: var(--ff-mono);
+}
+
+/* ── LAYOUT ──────────────────────────────── */
+.wrap { max-width: 980px; margin: 0 auto; padding: 0 48px; }
+
+/* ── SECCIONES ───────────────────────────── */
+.sec {
+  padding: 64px 0 56px;
+  border-bottom: 1px solid var(--border-fine);
+}
+.sec:last-of-type { border-bottom: none; }
+
+.sec-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+.sec-num {
+  font-family: var(--ff-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--wine);
+  background: var(--wine-ghost);
+  border: 1px solid rgba(107,20,40,0.15);
+  border-radius: 4px;
+  padding: 3px 9px;
+}
+.sec-line { flex: 1; height: 1px; background: var(--border-fine); }
+
+.sec-title {
+  font-family: var(--ff-display);
+  font-size: 38px;
+  font-weight: 400;
+  line-height: 1.15;
+  color: var(--void);
+  margin-bottom: 12px;
+}
+.sec-title em { font-style: italic; color: var(--wine); }
+.sec-lead {
+  font-size: 16px;
+  color: var(--earth);
+  max-width: 620px;
+  line-height: 1.65;
+  font-weight: 300;
+  margin-bottom: 36px;
+}
+
+h3 {
+  font-family: var(--ff-display);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--void);
+  margin-bottom: 14px;
+  margin-top: 36px;
+}
+h3:first-child { margin-top: 0; }
+
+p { color: var(--mid); margin-bottom: 14px; font-weight: 300; }
+
+/* ── CARDS ───────────────────────────────── */
+.card {
+  background: var(--white);
+  border: 1px solid var(--border-fine);
+  border-radius: 12px;
+  padding: 28px 32px;
+}
+.card-dark {
+  background: var(--deep);
+  border: none;
+  color: var(--parch);
+}
+.card-wine { background: var(--wine-ghost); border: 1px solid rgba(107,20,40,0.15); }
+.card-gold { background: var(--gold-pale); border: 1px solid rgba(192,128,32,0.2); }
+.card-sage { background: var(--sage-pale); border: 1px solid rgba(45,92,58,0.2); }
+.card-slate { background: var(--slate-pale); border: 1px solid rgba(26,48,72,0.2); }
+
+/* ── GRIDS ───────────────────────────────── */
+.g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+.g4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; }
+
+/* ── ANTES / DESPUÉS ─────────────────────── */
+.vs-grid {
+  display: grid;
+  grid-template-columns: 1fr 48px 1fr;
+  gap: 0;
+  align-items: stretch;
+  border: 1px solid var(--border-fine);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.vs-col { padding: 28px 30px; }
+.vs-col-before { background: #f8f0f0; }
+.vs-col-after { background: var(--sage-pale); }
+.vs-divider {
+  background: var(--paper);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--ff-display);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--straw);
+  border-left: 1px solid var(--border-fine);
+  border-right: 1px solid var(--border-fine);
+}
+.vs-label {
+  font-family: var(--ff-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+  font-weight: 500;
+}
+.vs-col-before .vs-label { color: var(--wine); }
+.vs-col-after .vs-label { color: var(--sage); }
+.vs-wine-text {
+  font-family: var(--ff-display);
+  font-size: 17px;
+  font-style: italic;
+  color: var(--mid);
+  line-height: 1.7;
+  padding: 16px 20px;
+  background: white;
+  border-radius: 8px;
+  border-left: 3px solid var(--wine-bright);
+}
+.vs-sage-text {
+  font-family: var(--ff-display);
+  font-size: 17px;
+  font-style: italic;
+  color: var(--dark);
+  line-height: 1.7;
+  padding: 16px 20px;
+  background: white;
+  border-radius: 8px;
+  border-left: 3px solid var(--sage-bright);
+}
+.vs-verdict {
+  margin-top: 12px;
+  font-size: 12.5px;
+  font-weight: 300;
+  line-height: 1.55;
+}
+.vs-col-before .vs-verdict { color: var(--wine-bright); }
+.vs-col-after .vs-verdict { color: var(--sage); }
+
+/* ── PIPELINE VISUAL ─────────────────────── */
+.pipeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  position: relative;
+}
+.pipeline::before {
+  content: '';
+  position: absolute;
+  left: 27px;
+  top: 52px;
+  bottom: 52px;
+  width: 2px;
+  background: linear-gradient(to bottom, var(--wine), var(--gold), var(--sage));
+  border-radius: 2px;
+}
+.pipe-step {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  padding: 20px 0;
+  position: relative;
+}
+.pipe-node {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+  border: 2px solid var(--border-mid);
+  background: var(--white);
+  position: relative;
+  z-index: 1;
+}
+.pn-1 { border-color: var(--wine); background: var(--wine-ghost); }
+.pn-2 { border-color: var(--gold); background: var(--gold-pale); }
+.pn-3 { border-color: var(--earth); background: var(--parch); }
+.pn-4 { border-color: var(--gold); background: var(--gold-pale); }
+.pn-5 { border-color: var(--sage); background: var(--sage-pale); }
+.pn-6 { border-color: var(--slate); background: var(--slate-pale); }
+.pipe-body { flex: 1; padding-top: 8px; }
+.pipe-tag {
+  font-family: var(--ff-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--straw);
+  margin-bottom: 4px;
+}
+.pipe-title {
+  font-family: var(--ff-display);
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--void);
+  margin-bottom: 6px;
+}
+.pipe-desc {
+  font-size: 13.5px;
+  color: var(--earth);
+  line-height: 1.6;
+  font-weight: 300;
+  margin: 0 0 10px;
+}
+.pipe-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pipe-chip {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 100px;
+  border: 1px solid var(--border-mid);
+  color: var(--earth);
+  background: var(--white);
+  font-family: var(--ff-mono);
+}
+
+/* ── FUENTES DE CONOCIMIENTO ─────────────── */
+.source-card {
+  border: 1px solid var(--border-fine);
+  border-radius: 10px;
+  background: var(--white);
+  overflow: hidden;
+}
+.source-header {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--border-fine);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.source-icon {
+  width: 36px; height: 36px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px;
+  flex-shrink: 0;
+}
+.source-title {
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--void);
+  margin-bottom: 2px;
+}
+.source-freq {
+  font-family: var(--ff-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.source-body { padding: 14px 20px; }
+.source-body p {
+  font-size: 13px;
+  color: var(--earth);
+  line-height: 1.55;
+  font-weight: 300;
+  margin: 0 0 10px;
+}
+.source-body p:last-child { margin: 0; }
+.source-items { list-style: none; }
+.source-items li {
+  font-size: 12.5px;
+  color: var(--mid);
+  padding: 5px 0;
+  border-bottom: 1px dashed var(--border-fine);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 300;
+}
+.source-items li:last-child { border-bottom: none; }
+.source-items li::before {
+  content: '';
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.si-web li::before { background: var(--slate-bright); }
+.si-humano li::before { background: var(--wine-bright); }
+.si-bodega li::before { background: var(--gold); }
+.si-tendencia li::before { background: var(--sage-bright); }
+
+/* ── CAPTURA DEL SUMILLER ────────────────── */
+.capture-interface {
+  background: var(--void);
+  border-radius: 14px;
+  padding: 32px;
+  position: relative;
+  overflow: hidden;
+}
+.capture-interface::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(rgba(192,128,32,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(192,128,32,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+.capture-label {
+  font-family: var(--ff-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold-bright);
+  margin-bottom: 20px;
+  position: relative;
+}
+.capture-input-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 14px;
+  position: relative;
+}
+.capture-field {
+  flex: 1;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(192,128,32,0.2);
+  border-radius: 8px;
+  padding: 12px 16px;
+  color: var(--parch);
+  font-family: var(--ff-body);
+  font-size: 13.5px;
+  font-weight: 300;
+}
+.capture-textarea {
+  width: 100%;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(192,128,32,0.2);
+  border-radius: 8px;
+  padding: 14px 16px;
+  color: var(--parch);
+  font-family: var(--ff-display);
+  font-size: 16px;
+  font-weight: 300;
+  font-style: italic;
+  line-height: 1.7;
+  resize: none;
+  min-height: 100px;
+  position: relative;
+}
+.capture-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+  position: relative;
+}
+.capture-chip {
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 100px;
+  border: 1px solid rgba(192,128,32,0.25);
+  color: var(--gold-bright);
+  background: rgba(192,128,32,0.1);
+  font-family: var(--ff-mono);
+  cursor: default;
+}
+.capture-chip.active {
+  background: rgba(192,128,32,0.25);
+  border-color: var(--gold-bright);
+}
+.capture-btn {
+  background: var(--wine-bright);
+  color: var(--white);
+  border: none;
+  border-radius: 8px;
+  padding: 11px 24px;
+  font-family: var(--ff-body);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  position: relative;
+}
+.capture-result {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(192,128,32,0.15);
+  border-left: 3px solid var(--gold-bright);
+  border-radius: 0 8px 8px 0;
+  padding: 16px 20px;
+  margin-top: 16px;
+  position: relative;
+}
+.capture-result-label {
+  font-family: var(--ff-mono);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--gold-bright);
+  margin-bottom: 8px;
+}
+.capture-result-text {
+  font-family: var(--ff-display);
+  font-size: 16px;
+  font-style: italic;
+  color: var(--parch);
+  line-height: 1.7;
+}
+
+/* ── CAPAS DE VINO ───────────────────────── */
+.wine-layers {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border-fine);
+}
+.wine-layer {
+  display: flex;
+  gap: 0;
+  min-height: 72px;
+}
+.layer-label {
+  width: 180px;
+  flex-shrink: 0;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+}
+.layer-num {
+  font-family: var(--ff-mono);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  font-weight: 500;
+}
+.layer-name {
+  font-family: var(--ff-display);
+  font-size: 16px;
+  font-weight: 600;
+}
+.layer-body {
+  flex: 1;
+  padding: 16px 24px;
+  border-left: 1px solid var(--border-fine);
+  background: var(--white);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.layer-desc {
+  font-size: 13px;
+  color: var(--earth);
+  line-height: 1.55;
+  font-weight: 300;
+  margin: 0 0 8px;
+}
+.layer-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.layer-tag {
+  font-size: 11.5px;
+  color: var(--mid);
+  background: var(--paper);
+  border: 1px solid var(--border-fine);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-family: var(--ff-mono);
+}
+.wl-1 .layer-label { background: var(--wine-ghost); }
+.wl-1 .layer-num { color: var(--wine); }
+.wl-1 .layer-name { color: var(--wine-deep); }
+.wl-2 .layer-label { background: var(--gold-pale); }
+.wl-2 .layer-num { color: var(--gold); }
+.wl-2 .layer-name { color: var(--gold-deep); }
+.wl-3 .layer-label { background: var(--parch); }
+.wl-3 .layer-num { color: var(--earth); }
+.wl-3 .layer-name { color: var(--dark); }
+.wl-4 .layer-label { background: var(--sage-pale); }
+.wl-4 .layer-num { color: var(--sage); }
+.wl-4 .layer-name { color: var(--sage-deep); }
+.wl-5 .layer-label { background: var(--slate-pale); }
+.wl-5 .layer-num { color: var(--slate-bright); }
+.wl-5 .layer-name { color: var(--slate-deep); }
+
+/* ── PERFILES DE CLIENTE ─────────────────── */
+.profile-card {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border-fine);
+}
+.profile-header {
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid var(--border-fine);
+}
+.profile-icon-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.profile-emoji { font-size: 24px; }
+.profile-name { font-family: var(--ff-display); font-size: 18px; font-weight: 600; }
+.profile-tag {
+  font-family: var(--ff-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 4px;
+  display: inline-block;
+  margin-bottom: 8px;
+}
+.profile-trigger {
+  font-size: 13px;
+  color: var(--earth);
+  font-style: italic;
+  font-family: var(--ff-display);
+  line-height: 1.5;
+}
+.profile-body { padding: 16px 22px; background: var(--white); }
+.profile-what {
+  font-size: 12.5px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--tan);
+  margin-bottom: 8px;
+  font-family: var(--ff-mono);
+}
+.profile-angle {
+  font-size: 13.5px;
+  color: var(--mid);
+  line-height: 1.6;
+  font-weight: 300;
+  margin-bottom: 12px;
+}
+.profile-sample {
+  background: var(--paper);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-family: var(--ff-display);
+  font-size: 15px;
+  font-style: italic;
+  color: var(--dark);
+  line-height: 1.65;
+  border-left: 2px solid;
+}
+.pc-conocedor .profile-header { background: var(--wine-ghost); }
+.pc-conocedor .profile-name { color: var(--wine-deep); }
+.pc-conocedor .profile-tag { background: var(--wine-ghost); color: var(--wine); border: 1px solid rgba(107,20,40,0.2); }
+.pc-conocedor .profile-sample { border-color: var(--wine-bright); }
+
+.pc-curioso .profile-header { background: var(--gold-pale); }
+.pc-curioso .profile-name { color: var(--gold-deep); }
+.pc-curioso .profile-tag { background: var(--gold-pale); color: var(--gold-deep); border: 1px solid rgba(192,128,32,0.3); }
+.pc-curioso .profile-sample { border-color: var(--gold); }
+
+.pc-ocasion .profile-header { background: var(--sage-pale); }
+.pc-ocasion .profile-name { color: var(--sage-deep); }
+.pc-ocasion .profile-tag { background: var(--sage-pale); color: var(--sage-deep); border: 1px solid rgba(45,92,58,0.2); }
+.pc-ocasion .profile-sample { border-color: var(--sage-bright); }
+
+/* ── CALLOUT ─────────────────────────────── */
+.callout {
+  border-radius: 8px;
+  padding: 16px 20px;
+  font-size: 14px;
+  line-height: 1.65;
+  margin: 20px 0;
+  font-weight: 300;
+}
+.callout strong { font-weight: 600; }
+.cl-wine { background: var(--wine-ghost); border-left: 3px solid var(--wine-bright); color: var(--wine-deep); }
+.cl-gold { background: var(--gold-pale); border-left: 3px solid var(--gold); color: var(--gold-deep); }
+.cl-sage { background: var(--sage-pale); border-left: 3px solid var(--sage-bright); color: var(--sage-deep); }
+.callout-label {
+  font-family: var(--ff-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 500;
+  display: block;
+  margin-bottom: 5px;
+}
+
+/* ── CICLO DE ACTUALIZACIÓN ──────────────── */
+.cycle-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.cycle-card {
+  background: var(--white);
+  border: 1px solid var(--border-fine);
+  border-radius: 10px;
+  padding: 22px 20px;
+}
+.cycle-freq {
+  font-family: var(--ff-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--straw);
+  margin-bottom: 10px;
+}
+.cycle-title { font-family: var(--ff-display); font-size: 18px; font-weight: 600; color: var(--void); margin-bottom: 8px; }
+.cycle-items { list-style: none; }
+.cycle-items li {
+  font-size: 13px;
+  color: var(--earth);
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--border-fine);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 1.45;
+  font-weight: 300;
+}
+.cycle-items li:last-child { border-bottom: none; }
+.cycle-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 5px;
+}
+
+/* ── ANTIPATRONES ────────────────────────── */
+.anti-item {
+  display: flex;
+  gap: 16px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--border-fine);
+  align-items: flex-start;
+}
+.anti-item:last-child { border-bottom: none; }
+.anti-icon {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.ai-no { background: #fee8e8; }
+.ai-yes { background: var(--sage-pale); }
+.anti-title { font-weight: 500; font-size: 14px; color: var(--void); margin-bottom: 4px; }
+.anti-desc { font-size: 13px; color: var(--earth); line-height: 1.55; font-weight: 300; margin: 0; }
+
+/* ── FOOTER ──────────────────────────────── */
+.doc-footer {
+  background: var(--void);
+  padding: 48px 64px;
+}
+.footer-inner {
+  max-width: 980px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 48px;
+  align-items: end;
+}
+.footer-title {
+  font-family: var(--ff-display);
+  font-size: 28px;
+  font-weight: 300;
+  font-style: italic;
+  color: var(--parch);
+  margin-bottom: 12px;
+  line-height: 1.3;
+}
+.footer-sub { font-size: 13px; color: rgba(240,228,204,0.45); font-weight: 300; line-height: 1.6; }
+.footer-stat { text-align: right; }
+.footer-stat-num {
+  font-family: var(--ff-display);
+  font-size: 52px;
+  font-weight: 300;
+  color: var(--gold-bright);
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.footer-stat-label { font-size: 13px; color: rgba(240,228,204,0.4); font-weight: 300; }
+
+@media (max-width: 700px) {
+  .cover { padding: 48px 28px 40px; }
+  .cover h1 { font-size: 38px; }
+  .wrap { padding: 0 24px; }
+  .g2, .g3, .g4, .cycle-grid { grid-template-columns: 1fr; }
+  .vs-grid { grid-template-columns: 1fr; }
+  .vs-divider { display: none; }
+  .wine-layer { flex-direction: column; }
+  .layer-label { width: 100%; }
+  .footer-inner { grid-template-columns: 1fr; }
+  .footer-stat { text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════ -->
+<!-- PORTADA                                  -->
+<!-- ════════════════════════════════════════ -->
+<div class="cover">
+  <div class="cover-bg-lines"></div>
+  <div class="cover-circle" style="width:500px;height:500px;top:-200px;right:-150px;"></div>
+  <div class="cover-circle" style="width:280px;height:280px;bottom:-100px;left:40px;"></div>
+  <div class="cover-circle" style="width:120px;height:120px;top:100px;right:200px;border-color:rgba(192,128,32,0.2)"></div>
+
+  <div class="cover-kicker">Sistema de conocimiento vivo · Vinoteca IA</div>
+  <h1>El sumiller que<br><em>aprende solo</em></h1>
+  <p class="cover-sub">Cómo construir y mantener el conocimiento del agente cuando las descripciones genéricas no venden y el mundo del vino cambia cada cosecha.</p>
+  <div class="cover-pills">
+    <span class="cover-pill">Knowledge Pipeline Continuo</span>
+    <span class="cover-pill">Enriquecimiento semántico</span>
+    <span class="cover-pill">Captura del sumiller humano</span>
+    <span class="cover-pill">RAG por perfil de cliente</span>
+    <span class="cover-pill">Actualización por cosecha</span>
+  </div>
+</div>
+
+<div class="wrap">
+
+<!-- ════════════════════════════════════════ -->
+<!-- 01 · EL PROBLEMA REAL                   -->
+<!-- ════════════════════════════════════════ -->
+<div class="sec">
+  <div class="sec-eyebrow"><span class="sec-num">01</span><div class="sec-line"></div></div>
+  <h2 class="sec-title">El problema del <em>conocimiento muerto</em></h2>
+  <p class="sec-lead">Una descripción genérica no solo no vende; activamente destruye la confianza. Si el agente suena a enciclopedia, el cliente siente que habla con una máquina, no con un sumiller.</p>
+
+  <div class="vs-grid" style="margin-bottom:32px">
+    <div class="vs-col vs-col-before">
+      <div class="vs-label">Lo que tenés hoy</div>
+      <div class="vs-wine-text">
+        "Color rojo rubí intenso con reflejos violáceos. Aromas a frutos rojos maduros, ciruela y especias. Taninos presentes, final largo y persistente."
+      </div>
+      <p class="vs-verdict">Este texto podría describir el 80% de los Malbec del mundo. No dice nada útil. No crea deseo. No le habla a nadie en particular.</p>
+    </div>
+    <div class="vs-divider">→</div>
+    <div class="vs-col vs-col-after">
+      <div class="vs-label">Lo que necesita el agente</div>
+      <div class="vs-sage-text">
+        "Viene de Gualtallary, a 1.400 metros. El enólogo Matías Michelini decidió ese año no filtrar el vino. Es intenso pero honesto, como el paisaje donde nació. Ideal si querés impresionar a alguien que ya sabe de vinos."
+      </div>
+      <p class="vs-verdict">Esto habla del origen, de una decisión humana, de una emoción, de un perfil de cliente. Tiene historia. Vende.</p>
+    </div>
+  </div>
+
+  <div class="callout cl-wine">
+    <span class="callout-label">El diagnóstico preciso</span>
+    El problema no es que falten datos. Es que los datos que tenés son del tipo equivocado. Las fichas técnicas describen el vino como objeto químico. El nuevo paradigma lo describe como <strong>experiencia, territorio y decisión humana</strong>. Son dos lenguajes completamente distintos.
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!-- 02 · LAS 5 CAPAS DE CONOCIMIENTO        -->
+<!-- ════════════════════════════════════════ -->
+<div class="sec">
+  <div class="sec-eyebrow"><span class="sec-num">02</span><div class="sec-line"></div></div>
+  <h2 class="sec-title">Las <em>cinco capas</em> de conocimiento de un vino</h2>
+  <p class="sec-lead">Todo vino tiene cinco dimensiones de conocimiento. Las fichas técnicas solo cubren la primera. El agente necesita las cinco para responder como un sumiller real.</p>
+
+  <div class="wine-layers">
+    <div class="wine-layer wl-1">
+      <div class="layer-label">
+        <span class="layer-num">Capa 01</span>
+        <span class="layer-name">El dato duro</span>
+      </div>
+      <div class="layer-body">
+        <p class="layer-desc">Lo que ya tenés. La base objetiva e indiscutible. Necesaria pero no suficiente para vender.</p>
+        <div class="layer-tags">
+          <span class="layer-tag">Bodega y varietal</span>
+          <span class="layer-tag">Cosecha y precio</span>
+          <span class="layer-tag">Región y sub-región</span>
+          <span class="layer-tag">Alcohol y crianza</span>
+          <span class="layer-tag">Notas organolépticas</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="wine-layer wl-2">
+      <div class="layer-label">
+        <span class="layer-num">Capa 02</span>
+        <span class="layer-name">El terruño</span>
+      </div>
+      <div class="layer-body">
+        <p class="layer-desc">La geografía que define el carácter del vino. Altura, suelo, clima, exposición solar. La razón por la que el mismo varietal sabe diferente a 800 que a 1.400 metros.</p>
+        <div class="layer-tags">
+          <span class="layer-tag">Altura sobre el nivel del mar</span>
+          <span class="layer-tag">Tipo de suelo</span>
+          <span class="layer-tag">Amplitud térmica</span>
+          <span class="layer-tag">Valle y micro-clima</span>
+          <span class="layer-tag">Comparativas de zona</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="wine-layer wl-3">
+      <div class="layer-label">
+        <span class="layer-num">Capa 03</span>
+        <span class="layer-name">La historia</span>
+      </div>
+      <div class="layer-body">
+        <p class="layer-desc">Las decisiones humanas que convirtieron una uva en ese vino específico. El enólogo que apostó por algo diferente. La cosecha atípica. La familia detrás de la bodega.</p>
+        <div class="layer-tags">
+          <span class="layer-tag">Enólogo y filosofía</span>
+          <span class="layer-tag">Historia de la bodega</span>
+          <span class="layer-tag">Decisiones vinícolas</span>
+          <span class="layer-tag">Hitos y premios relevantes</span>
+          <span class="layer-tag">Anécdotas reales</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="wine-layer wl-4">
+      <div class="layer-label">
+        <span class="layer-num">Capa 04</span>
+        <span class="layer-name">La tendencia</span>
+      </div>
+      <div class="layer-body">
+        <p class="layer-desc">El contexto del mundo del vino en este momento. Qué estilos están valorando los críticos. Qué regiones están emergiendo. Por qué este vino específico es relevante ahora.</p>
+        <div class="layer-tags">
+          <span class="layer-tag">Natural vs convencional</span>
+          <span class="layer-tag">Valoración de uvas olvidadas</span>
+          <span class="layer-tag">Alta altitud en boga</span>
+          <span class="layer-tag">Menos intervención</span>
+          <span class="layer-tag">Sostenibilidad y orgánico</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="wine-layer wl-5">
+      <div class="layer-label">
+        <span class="layer-num">Capa 05</span>
+        <span class="layer-name">La voz propia</span>
+      </div>
+      <div class="layer-body">
+        <p class="layer-desc">La opinión del sumiller humano de la vinoteca. La experiencia personal. El "a mí este vino me recuerda a…". Lo que diferencia la vinoteca de cualquier e-commerce anónimo.</p>
+        <div class="layer-tags">
+          <span class="layer-tag">Cata personal del sumiller</span>
+          <span class="layer-tag">Contexto de la visita a bodega</span>
+          <span class="layer-tag">Comparativa con otros en catálogo</span>
+          <span class="layer-tag">Para quién lo recomendaría</span>
+          <span class="layer-tag">Momentos ideales para abrirlo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout cl-gold" style="margin-top:20px">
+    <span class="callout-label">La capa más valiosa y más difícil</span>
+    La Capa 05 — la voz propia — es la única que ningún competidor puede copiar. Es el conocimiento tácito del sumiller humano. El sistema debe facilitar su captura de forma que no sea una carga extra sino parte natural del flujo de trabajo diario.
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!-- 03 · EL PIPELINE DE CONOCIMIENTO        -->
+<!-- ════════════════════════════════════════ -->
+<div class="sec">
+  <div class="sec-eyebrow"><span class="sec-num">03</span><div class="sec-line"></div></div>
+  <h2 class="sec-title">El <em>Knowledge Pipeline</em> continuo</h2>
+  <p class="sec-lead">No es una carga inicial de datos. Es un proceso vivo de seis pasos que transforma información dispersa en conocimiento accionable para el agente.</p>
+
+  <div class="pipeline" style="margin-bottom:28px">
+
+    <div class="pipe-step">
+      <div class="pipe-node pn-1">🌱</div>
+      <div class="pipe-body">
+        <div class="pipe-tag">Paso 01 · Punto de partida</div>
+        <div class="pipe-title">Rescate y reescritura del catálogo existente</div>
+        <p class="pipe-desc">Las descripciones genéricas actuales no se tiran: se usan como semilla. Un agente de enriquecimiento recibe cada descripción aburrida junto con los datos duros del vino y genera una versión en las cinco capas. El sumiller humano aprueba, corrige o descarta. Este paso se hace una sola vez al inicio y tarda aproximadamente una semana para un catálogo de 200 vinos.</p>
+        <div class="pipe-detail">
+          <span class="pipe-chip">Input: ficha técnica existente</span>
+          <span class="pipe-chip">Proceso: LLM enriquecedor</span>
+          <span class="pipe-chip">Output: 5 capas por vino</span>
+          <span class="pipe-chip">Validación: sumiller humano</span>
+          <span class="pipe-chip">Duración: ~1 semana</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="pipe-step">
+      <div class="pipe-node pn-2">🔍</div>
+      <div class="pipe-body">
+        <div class="pipe-tag">Paso 02 · Fuentes externas automáticas</div>
+        <div class="pipe-title">Web scraping semántico de bodegas y críticos</div>
+        <p class="pipe-desc">Un agente rastreador visita periódicamente los sitios de las bodegas del catálogo, las cuentas de Instagram de los enólogos, las revistas especializadas (Vinetur, Decanter, Wine Spectator en español) y los podcasts clave. Extrae fragmentos relevantes, los clasifica por vino y los incorpora al catálogo vectorial. No copia texto: extrae conocimiento.</p>
+        <div class="pipe-detail">
+          <span class="pipe-chip">Sitios web de bodegas</span>
+          <span class="pipe-chip">Instagram enólogos</span>
+          <span class="pipe-chip">Vinetur / Decanter ES</span>
+          <span class="pipe-chip">Podcasts especializados</span>
+          <span class="pipe-chip">Frecuencia: semanal</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="pipe-step">
+      <div class="pipe-node pn-3">🎤</div>
+      <div class="pipe-body">
+        <div class="pipe-tag">Paso 03 · Captura del sumiller humano</div>
+        <div class="pipe-title">La interfaz de voz del conocimiento tácito</div>
+        <p class="pipe-desc">El sumiller tiene una app simple donde puede hablar o escribir sobre cualquier vino después de probarlo, visitar una bodega o leer algo interesante. No es un formulario: es una conversación. El sistema procesa lo que dice, extrae los fragmentos de conocimiento, los asocia al vino correcto y actualiza el catálogo. Esto convierte el conocimiento oral en datos estructurados sin fricción.</p>
+        <div class="pipe-detail">
+          <span class="pipe-chip">Input: voz o texto libre</span>
+          <span class="pipe-chip">Transcripción automática</span>
+          <span class="pipe-chip">Extracción semántica</span>
+          <span class="pipe-chip">Asociación automática al vino</span>
+          <span class="pipe-chip">Validación: 1 clic</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="pipe-step">
+      <div class="pipe-node pn-4">📸</div>
+      <div class="pipe-body">
+        <div class="pipe-tag">Paso 04 · Señales de tendencia</div>
+        <div class="pipe-title">Monitor de tendencias del mundo del vino</div>
+        <p class="pipe-desc">Un agente especializado monitorea hashtags, publicaciones de influencers del vino, notas de prensa de ferias (Vinexpo, Prowein, ProWine) y los rankings anuales de Robert Parker y Wine Spectator. Cuando detecta que un vino del catálogo o una región específica está ganando relevancia, actualiza automáticamente la capa de tendencia de los vinos relacionados. El sumiller recibe un resumen semanal de novedades relevantes para su catálogo.</p>
+        <div class="pipe-detail">
+          <span class="pipe-chip">Rankings Parker / WS</span>
+          <span class="pipe-chip">Ferias internacionales</span>
+          <span class="pipe-chip">Influencers especializados</span>
+          <span class="pipe-chip">Resumen semanal al sumiller</span>
+          <span class="pipe-chip">Frecuencia: diaria</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="pipe-step">
+      <div class="pipe-node pn-5">🗣️</div>
+      <div class="pipe-body">
+        <div class="pipe-tag">Paso 05 · Aprendizaje de conversaciones</div>
+        <div class="pipe-title">El agente aprende de sus propias ventas</div>
+        <p class="pipe-desc">Cada conversación que termina en venta es una señal. El sistema registra qué argumentos funcionaron con qué perfil de cliente. Si tres clientes del tipo "coleccionista" compraron el Achaval Ferrer después de mencionar el terruño de Gualtallary, el sistema refuerza ese ángulo en el catálogo. Si cinco clientes de "regalo" preguntaron por el packaging después de cierta descripción, el sistema aprende que ese cliente necesita esa información proactivamente.</p>
+        <div class="pipe-detail">
+          <span class="pipe-chip">Registro de argumentos exitosos</span>
+          <span class="pipe-chip">Segmentación por perfil</span>
+          <span class="pipe-chip">Refuerzo automático</span>
+          <span class="pipe-chip">Revisión: LLM-as-a-Judge semanal</span>
+          <span class="pipe-chip">Sin datos personales</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="pipe-step">
+      <div class="pipe-node pn-6">🆕</div>
+      <div class="pipe-body">
+        <div class="pipe-tag">Paso 06 · Incorporación de nuevas cosechas</div>
+        <div class="pipe-title">Protocolo de onboarding para cada vino nuevo</div>
+        <p class="pipe-desc">Cuando llega un vino nuevo al catálogo, el sistema dispara automáticamente un flujo de enriquecimiento: busca información de la bodega en la web, compara la cosecha con años anteriores si los tiene, y le presenta al sumiller un formulario precompletado de 5 preguntas abiertas para que complete las capas que el sistema no pudo llenar solo. El vino solo entra al catálogo del agente cuando tiene al menos 3 de las 5 capas completas.</p>
+        <div class="pipe-detail">
+          <span class="pipe-chip">Trigger: nuevo SKU en sistema</span>
+          <span class="pipe-chip">Búsqueda automática</span>
+          <span class="pipe-chip">5 preguntas al sumiller</span>
+          <span class="pipe-chip">Umbral: 3/5 capas para activar</span>
+          <span class="pipe-chip">Tiempo: &lt;24hs</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!-- 04 · FUENTES DE CONOCIMIENTO DETALLADAS -->
+<!-- ════════════════════════════════════════ -->
+<div class="sec">
+  <div class="sec-eyebrow"><span class="sec-num">04</span><div class="sec-line"></div></div>
+  <h2 class="sec-title">Las <em>fuentes</em> de conocimiento</h2>
+  <p class="sec-lead">Cada fuente tiene una naturaleza diferente, una frecuencia de actualización distinta y un tipo de conocimiento específico que aporta. No todas son iguales ni se procesan igual.</p>
+
+  <div class="g2">
+
+    <div class="source-card">
+      <div class="source-header">
+        <div class="source-icon" style="background:var(--slate-pale)">🌐</div>
+        <div>
+          <div class="source-title">Sitios web de bodegas</div>
+          <div class="source-freq" style="color:var(--slate-bright)">Scraping mensual automático</div>
+        </div>
+      </div>
+      <div class="source-body">
+        <p>Las propias bodegas son la fuente más confiable sobre terruño e historia. Sus sitios tienen información que no aparece en ninguna ficha técnica: la filosofía del enólogo, el origen del nombre, la historia familiar, las decisiones de viticultura.</p>
+        <ul class="source-items si-web">
+          <li>Página "Nosotros" y filosofía de la bodega</li>
+          <li>Descripción de los viñedos y zonas de cultivo</li>
+          <li>Notas del enólogo por cosecha</li>
+          <li>Novedades y lanzamientos de líneas nuevas</li>
+          <li>Premios y reconocimientos recientes</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="source-card">
+      <div class="source-header">
+        <div class="source-icon" style="background:var(--wine-ghost)">🎤</div>
+        <div>
+          <div class="source-title">Voz del sumiller humano</div>
+          <div class="source-freq" style="color:var(--wine)">Captura continua, bajo demanda</div>
+        </div>
+      </div>
+      <div class="source-body">
+        <p>El activo más valioso y más difícil de digitalizar. Lo que el sumiller vio cuando visitó la bodega, lo que el enólogo le dijo entre copa y copa, la comparación que solo alguien que los probó ambos puede hacer.</p>
+        <ul class="source-items si-humano">
+          <li>Notas de visitas a bodegas y terruños</li>
+          <li>Impresiones de cata personal</li>
+          <li>Anécdotas del enólogo o propietario</li>
+          <li>Comparativas con otros vinos del catálogo</li>
+          <li>Para qué perfil de cliente lo elegiría</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="source-card">
+      <div class="source-header">
+        <div class="source-icon" style="background:var(--gold-pale)">📱</div>
+        <div>
+          <div class="source-title">Redes sociales especializadas</div>
+          <div class="source-freq" style="color:var(--gold)">Monitor semanal automatizado</div>
+        </div>
+      </div>
+      <div class="source-body">
+        <p>Instagram y TikTok de enólogos, sommeliers internacionales y viajantes de vino son hoy más ágiles que cualquier revista. Una publicación de Matías Michelini sobre por qué decidió cambiar el proceso de elaboración es conocimiento de primera mano en tiempo real.</p>
+        <ul class="source-items si-tendencia">
+          <li>Instagram de enólogos del catálogo</li>
+          <li>TikTok de sommeliers con audiencia</li>
+          <li>Cuentas de bodegas en redes</li>
+          <li>Hashtags de ferias y eventos clave</li>
+          <li>Reseñas de influencers especializados</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="source-card">
+      <div class="source-header">
+        <div class="source-icon" style="background:var(--sage-pale)">📰</div>
+        <div>
+          <div class="source-title">Revistas y críticos especializados</div>
+          <div class="source-freq" style="color:var(--sage)">Ingesta mensual / por lanzamiento</div>
+        </div>
+      </div>
+      <div class="source-body">
+        <p>Las publicaciones especializadas tienen el contexto del mercado global que los demás no tienen. Una nota en Wine Spectator sobre la emergencia de Gualtallary como la nueva gran región argentina tiene un peso enorme para el perfil de cliente coleccionista.</p>
+        <ul class="source-items si-tendencia">
+          <li>Vinetur y Decanter (ediciones en español)</li>
+          <li>Puntuaciones Robert Parker / WS relevantes</li>
+          <li>Revistas argentinas: Vinos y Gastronomía, Cuisine</li>
+          <li>Rankings anuales de vinos argentinos</li>
+          <li>Notas sobre bodegas emergentes</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="source-card">
+      <div class="source-header">
+        <div class="source-icon" style="background:var(--parch)">🎙️</div>
+        <div>
+          <div class="source-title">Podcasts y entrevistas</div>
+          <div class="source-freq" style="color:var(--earth)">Transcripción y extracción automática</div>
+        </div>
+      </div>
+      <div class="source-body">
+        <p>Los podcasts de vino tienen el formato de conversación más honesto: el enólogo habla sin filtro de por qué tomó ciertas decisiones. La transcripción automática + extracción semántica convierte esas horas en fragmentos de conocimiento concretos.</p>
+        <ul class="source-items si-bodega">
+          <li>Podcast "Terroir y Alma" (Argentina)</li>
+          <li>Entrevistas en YouTube de bodegas</li>
+          <li>Charlas TEDx de enólogos locales</li>
+          <li>Radio y tv especializada (Canal Gourmet)</li>
+          <li>Masterclasses online registradas</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="source-card">
+      <div class="source-header">
+        <div class="source-icon" style="background:var(--wine-ghost)">🏆</div>
+        <div>
+          <div class="source-title">Ferias y concursos internacionales</div>
+          <div class="source-freq" style="color:var(--wine)">Ingesta post-evento</div>
+        </div>
+      </div>
+      <div class="source-body">
+        <p>Los resultados de Vinexpo, Prowein, el Concurso Mundial de Bruselas o Mundus Vini actualizan inmediatamente la relevancia de bodegas enteras. Un vino que ganó medalla de oro en Bruselas tiene un argumento de venta nuevo que el catálogo debe reflejar.</p>
+        <ul class="source-items si-bodega">
+          <li>Concurso Mundial de Bruselas (anual)</li>
+          <li>Decanter World Wine Awards</li>
+          <li>Gran Malbec y concursos argentinos</li>
+          <li>Vinexpo y Prowein (comunicados)</li>
+          <li>Premios Wines of Argentina</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!-- 05 · CAPTURA DEL SUMILLER HUMANO        -->
+<!-- ════════════════════════════════════════ -->
+<div class="sec">
+  <div class="sec-eyebrow"><span class="sec-num">05</span><div class="sec-line"></div></div>
+  <h2 class="sec-title">La <em>interfaz de captura</em> del sumiller</h2>
+  <p class="sec-lead">El sistema de captura del conocimiento tácito debe tener una sola característica: que no parezca trabajo. El sumiller habla o escribe en lenguaje natural, el sistema hace el resto.</p>
+
+  <div class="capture-interface">
+    <div class="capture-label">Interfaz de captura de conocimiento — sumiller</div>
+
+    <div class="capture-input-row">
+      <div class="capture-field" style="flex:0.4">Achaval Ferrer Malbec 2022</div>
+      <div class="capture-field" style="flex:0.3">📍 Visita a bodega</div>
+      <div class="capture-field" style="flex:0.3">🎤 Voz → texto</div>
+    </div>
+
+    <div class="capture-chips">
+      <span class="capture-chip active">Terruño</span>
+      <span class="capture-chip active">Historia</span>
+      <span class="capture-chip">Maridaje</span>
+      <span class="capture-chip active">Perfil de cliente</span>
+      <span class="capture-chip">Comparativa</span>
+      <span class="capture-chip">Tendencia</span>
+    </div>
+
+    <div class="capture-textarea" style="width:100%;display:block">
+      "Estuve en la bodega la semana pasada. El winemaker me contó que en 2022 tuvieron un verano más frío de lo normal en Gualtallary y eso concentró los taninos de manera diferente. Es más tenso que el 2021, necesita una hora de decantación. Perfecto para alguien que quiere guardar 3-4 años o para acompañar una carne con mucha estructura..."
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;margin-top:12px;position:relative">
+      <div class="capture-btn">Guardar y asociar al catálogo →</div>
+    </div>
+
+    <div class="capture-result">
+      <div class="capture-result-label">El agente aprendió esto sobre Achaval Ferrer 2022</div>
+      <div class="capture-result-text">
+        "La cosecha 2022 fue más fresca que 2021 en Gualtallary. El enólogo notó que eso creó taninos más tensos y compactos. El vino necesita decantación de al menos una hora para abrirse. Tiene potencial de guarda de 3 a 4 años. Recomendado para carnes de estructura fuerte o para clientes que buscan algo para guardar. Diferencia clave con el 2021: éste es más austero al principio, más recompensador con el tiempo."
+      </div>
+    </div>
+  </div>
+
+  <div class="callout cl-gold" style="margin-top:20px">
+    <span class="callout-label">La regla de los 2 minutos</span>
+    Si capturar conocimiento le toma más de 2 minutos al sumiller, no lo va a hacer. La interfaz debe funcionar con un mensaje de voz, un texto de WhatsApp o una nota de voz grabada caminando entre estantes. El sistema hace la transcripción, extrae los fragmentos de conocimiento y pide confirmación con un solo clic.
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!-- 06 · RAG POR PERFIL DE CLIENTE          -->
+<!-- ════════════════════════════════════════ -->
+<div class="sec">
+  <div class="sec-eyebrow"><span class="sec-num">06</span><div class="sec-line"></div></div>
+  <h2 class="sec-title">El mismo vino, <em>tres historias</em> distintas</h2>
+  <p class="sec-lead">El conocimiento del catálogo no se usa igual para todos. El perfil del cliente determina qué capa de conocimiento el agente pone al frente. El Achaval Ferrer es el mismo vino; la historia que cuenta el agente no lo es.</p>
+
+  <div class="g3" style="margin-bottom:28px">
+
+    <div class="profile-card pc-conocedor">
+      <div class="profile-header">
+        <div class="profile-icon-row">
+          <span class="profile-emoji">🧐</span>
+          <span class="profile-name">El coleccionista</span>
+        </div>
+        <span class="profile-tag">Conocedor / experto</span>
+        <div class="profile-trigger">"¿Tienen el Achaval Ferrer? ¿Cuál es la diferencia entre el 2021 y el 2022?"</div>
+      </div>
+      <div class="profile-body">
+        <div class="profile-what">Qué capas activar</div>
+        <p class="profile-angle">Este cliente sabe de vinos. Si el agente le explica que el color es "rojo rubí", lo pierde en la primera frase. Necesita terruño técnico, decisiones del enólogo y diferencias entre cosechas. Lo que no sabe es lo que el sumiller humano le dijo al enólogo cara a cara.</p>
+        <div class="profile-sample" style="border-color: #9b2040">
+          "La 2022 tuvo un verano más fresco en Gualtallary, lo que generó taninos más compactos que la 2021. El enólogo decidió extender la maceración para compensar. Si la abrís ahora, una hora de decantación mínimo. Si podés guardarla 3 años, mejor."
+        </div>
+      </div>
+    </div>
+
+    <div class="profile-card pc-curioso">
+      <div class="profile-header">
+        <div class="profile-icon-row">
+          <span class="profile-emoji">🙋</span>
+          <span class="profile-name">El curioso</span>
+        </div>
+        <span class="profile-tag">Aprendiendo / explorando</span>
+        <div class="profile-trigger">"Me quiero meter más en el mundo del vino. ¿Qué me recomendás para empezar a entender los tintos?"</div>
+      </div>
+      <div class="profile-body">
+        <div class="profile-what">Qué capas activar</div>
+        <p class="profile-angle">Este cliente quiere aprender pero no abrumarse. Necesita historia accesible y un ángulo emocional que lo enganche. El terruño sirve pero en versión narrativa, no técnica. La tendencia le da contexto de por qué algo es relevante ahora.</p>
+        <div class="profile-sample" style="border-color: #c08020">
+          "Gualtallary está a 1.400 metros. El aire es tan seco que las uvas concentran todo su sabor sin pudrirse. El enólogo de Achaval Ferrer lleva 20 años apostando solo por ese lugar. Es como probar una decisión de vida embotellada."
+        </div>
+      </div>
+    </div>
+
+    <div class="profile-card pc-ocasion">
+      <div class="profile-header">
+        <div class="profile-icon-row">
+          <span class="profile-emoji">🎁</span>
+          <span class="profile-name">El de ocasión</span>
+        </div>
+        <span class="profile-tag">Regalo / cena / evento</span>
+        <div class="profile-trigger">"Tengo una cena el sábado con los suegros. Algo que quede bien y que no falle."</div>
+      </div>
+      <div class="profile-body">
+        <div class="profile-what">Qué capas activar</div>
+        <p class="profile-angle">Este cliente no quiere saber de terruños ni de cosechas. Quiere seguridad emocional: que nadie lo juzgue por el vino que llevó. Necesita la historia en versión "no podés equivocarte" y la validación social (premios, reconocimiento).</p>
+        <div class="profile-sample" style="border-color: #4a8c5a">
+          "El Achaval Ferrer es el que llevan cuando quieren impresionar sin arriesgar. Ganó medalla de oro en Bruselas el año pasado. Si alguien en la mesa sabe de vinos, va a saber lo que es. Si no saben, igual les va a encantar."
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="callout cl-sage">
+    <span class="callout-label">Cómo el agente detecta el perfil</span>
+    El agente no le pregunta al cliente "¿sos experto o principiante?". Lo infiere del lenguaje que usa. "Diferencia entre cosechas" → coleccionista. "Quiero aprender" → curioso. "Que quede bien / para regalo" → ocasión. En conversaciones recurrentes, el perfil está en la memoria episódica y no hay que inferirlo.
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!-- 07 · CICLO DE ACTUALIZACIÓN             -->
+<!-- ════════════════════════════════════════ -->
+<div class="sec">
+  <div class="sec-eyebrow"><span class="sec-num">07</span><div class="sec-line"></div></div>
+  <h2 class="sec-title">El ciclo de <em>actualización</em></h2>
+  <p class="sec-lead">El conocimiento tiene fecha de vencimiento. Un dato viejo es tan peligroso como un dato ausente. El sistema tiene tres frecuencias de actualización según la velocidad de cambio de cada tipo de información.</p>
+
+  <div class="cycle-grid">
+    <div class="cycle-card" style="border-top:3px solid var(--wine)">
+      <div class="cycle-freq" style="color:var(--wine)">⚡ Tiempo real / diario</div>
+      <div class="cycle-title">Datos que cambian rápido</div>
+      <ul class="cycle-items">
+        <li><div class="cycle-dot" style="background:var(--wine)"></div>Stock y precios (base de datos SQL, siempre)</li>
+        <li><div class="cycle-dot" style="background:var(--wine)"></div>Publicaciones en redes sociales de bodegas</li>
+        <li><div class="cycle-dot" style="background:var(--wine)"></div>Noticias de premios o reconocimientos</li>
+        <li><div class="cycle-dot" style="background:var(--wine)"></div>Promociones vigentes inyectadas en contexto</li>
+        <li><div class="cycle-dot" style="background:var(--wine)"></div>Disponibilidad de packaging especial</li>
+      </ul>
+    </div>
+
+    <div class="cycle-card" style="border-top:3px solid var(--gold)">
+      <div class="cycle-freq" style="color:var(--gold)">📆 Semanal</div>
+      <div class="cycle-title">Datos que evolucionan</div>
+      <ul class="cycle-items">
+        <li><div class="cycle-dot" style="background:var(--gold)"></div>Resumen de tendencias del mundo del vino</li>
+        <li><div class="cycle-dot" style="background:var(--gold)"></div>Nuevas notas del sumiller humano</li>
+        <li><div class="cycle-dot" style="background:var(--gold)"></div>Argumentos de venta que funcionaron</li>
+        <li><div class="cycle-dot" style="background:var(--gold)"></div>Revisión del LLM-as-a-Judge</li>
+        <li><div class="cycle-dot" style="background:var(--gold)"></div>Incorporación de vinos nuevos al catálogo</li>
+      </ul>
+    </div>
+
+    <div class="cycle-card" style="border-top:3px solid var(--sage)">
+      <div class="cycle-freq" style="color:var(--sage)">📅 Por cosecha / anual</div>
+      <div class="cycle-title">Datos estructurales</div>
+      <ul class="cycle-items">
+        <li><div class="cycle-dot" style="background:var(--sage)"></div>Actualización de cosechas nuevas</li>
+        <li><div class="cycle-dot" style="background:var(--sage)"></div>Re-scraping completo de sitios de bodegas</li>
+        <li><div class="cycle-dot" style="background:var(--sage)"></div>Integración de rankings anuales</li>
+        <li><div class="cycle-dot" style="background:var(--sage)"></div>Revisión de la constitución del agente</li>
+        <li><div class="cycle-dot" style="background:var(--sage)"></div>Evaluación del Golden Dataset de QA</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!-- 08 · ANTIPATRONES A EVITAR              -->
+<!-- ════════════════════════════════════════ -->
+<div class="sec">
+  <div class="sec-eyebrow"><span class="sec-num">08</span><div class="sec-line"></div></div>
+  <h2 class="sec-title"><em>Antipatrones</em> a evitar</h2>
+  <p class="sec-lead">Hay errores de diseño que arruinan el sistema antes de que empiece a funcionar. Estos son los más comunes en catálogos de vino y los más fáciles de cometer.</p>
+
+  <div style="margin-top:8px">
+    <div class="anti-item">
+      <div class="anti-icon ai-no">✗</div>
+      <div>
+        <div class="anti-title">Usar vectores para precios y stock</div>
+        <p class="anti-desc">El precio de un vino nunca debe recuperarse por búsqueda semántica. "¿Cuánto cuesta el Catena?" necesita una consulta SQL exacta, no un embedding que "se parece" al precio. Los vectores son para texto cualitativo. El SQL es para datos transaccionales. Mezclarlos genera alucinaciones matemáticas: el agente confunde el precio de una cosecha con otra o inventa un número que "suena razonable".</p>
+      </div>
+    </div>
+    <div class="anti-item">
+      <div class="anti-icon ai-no">✗</div>
+      <div>
+        <div class="anti-title">Dejar que el agente improvise sobre lo que no sabe</div>
+        <p class="anti-desc">Si la capa de terruño de un vino está vacía, el agente no debe inventarla. Debe reconocer el límite y decirlo con gracia: "De ese vino no tengo toda la historia todavía, pero puedo contarte lo que sé de la región y del estilo". La honestidad construye confianza; la invención la destruye en un momento.</p>
+      </div>
+    </div>
+    <div class="anti-item">
+      <div class="anti-icon ai-no">✗</div>
+      <div>
+        <div class="anti-title">Tratar todas las fuentes como igualmente confiables</div>
+        <p class="anti-desc">Una publicación del propio enólogo vale más que un blog anónimo. Un scraping del sitio oficial de la bodega pesa más que un comentario de Vivino. El sistema debe mantener una jerarquía de confianza por fuente: primero el sumiller humano, luego la bodega oficial, luego críticos establecidos, luego redes sociales verificadas, luego el resto.</p>
+      </div>
+    </div>
+    <div class="anti-item">
+      <div class="anti-icon ai-no">✗</div>
+      <div>
+        <div class="anti-title">Cargar el catálogo completo en cada conversación</div>
+        <p class="anti-desc">Con 200 vinos en catálogo, inyectar toda la información de cada uno en cada conversación consume el presupuesto de tokens del modelo en segundos y entierra la señal bajo el ruido. El RAG existe precisamente para recuperar solo los fragmentos relevantes para la consulta actual. La recuperación selectiva no es una optimización; es la arquitectura correcta.</p>
+      </div>
+    </div>
+    <div class="anti-item" style="border-bottom:none">
+      <div class="anti-icon ai-no">✗</div>
+      <div>
+        <div class="anti-title">No versionar el catálogo de conocimiento</div>
+        <p class="anti-desc">Cuando el conocimiento se actualiza (llega una cosecha nueva, el sumiller corrije una información errónea) el sistema debe mantener el historial. Si el agente empieza a comportarse raro después de una actualización, es necesario poder volver a la versión anterior. Sin versionado del catálogo, cada actualización es un riesgo sin red de seguridad.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /wrap -->
+
+<!-- ════════════════════════════════════════ -->
+<!-- FOOTER                                  -->
+<!-- ════════════════════════════════════════ -->
+<div class="doc-footer">
+  <div class="footer-inner">
+    <div>
+      <div class="footer-title">"El mejor sumiller no es el que más sabe. Es el que mejor sabe qué contarle a cada persona."</div>
+      <p class="footer-sub">Knowledge Pipeline Continuo para vinotecas · Complemento del documento de diseño del Agente Sumiller IA · v1.0<br>Basado en la Guía de Arquitectura para Sistemas de Agentes Autónomos y la Guía de Entorno de Desarrollo Agno.</p>
+    </div>
+    <div class="footer-stat">
+      <div class="footer-stat-num">5</div>
+      <div class="footer-stat-label">capas de conocimiento por cada vino del catálogo</div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
