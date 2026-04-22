@@ -3,7 +3,7 @@
 Reemplazamos los factories de agentes/teams por dobles livianos para evitar
 inicializar modelos reales (Claude/OpenAI) ni conectar a la DB. Validamos:
 
-- Rutas de dominio (`/health`, `/chat`, `/pedido/.../aprobar`, `/admin/auditor/run`)
+- Rutas de dominio (`/health`, `/chat`, `/webhook`, `/pedido/.../aprobar`, `/admin/auditor/run`)
   siguen registradas.
 - AgentOS suma rutas típicas (`/agents`, `/approvals/*`).
 - El middleware `InternalPathsGuard` bloquea el acceso externo a las rutas
@@ -79,6 +79,7 @@ def test_app_combines_domain_and_agent_os_routes(patched_agents):
     paths_base = {getattr(r, "path", "") for r in base.routes}
     assert "/health" in paths_base
     assert "/chat" in paths_base
+    assert "/webhook" in paths_base
     assert "/pedido/{run_id}/aprobar" in paths_base
     assert "/admin/auditor/run" in paths_base
 
@@ -90,6 +91,7 @@ def test_app_combines_domain_and_agent_os_routes(patched_agents):
     paths = {getattr(r, "path", "") for r in app.routes}
     assert "/health" in paths
     assert "/chat" in paths
+    assert "/webhook" in paths
     assert any(p.startswith("/agents") for p in paths), (
         f"AgentOS debería exponer /agents: {paths}"
     )
@@ -131,4 +133,21 @@ def test_chat_route_public_even_from_external_ip(patched_agents):
 
     client = TestClient(app)
     resp = client.post("/chat", json={})
+    assert resp.status_code != 404, resp.text
+
+
+def test_webhook_route_public_even_from_external_ip(patched_agents):
+    """MP notifica por POST; el middleware debe dejar pasar `/webhook` (no 404)."""
+    from api.main import create_base_app
+    from core.agent_os_factory import build_agent_os
+
+    base = create_base_app()
+    try:
+        app = build_agent_os(base_app=base).get_app()
+    except Exception as exc:
+        pytest.skip(f"AgentOS no construible en este entorno: {exc}")
+    _force_external_client(app)
+
+    client = TestClient(app)
+    resp = client.post("/webhook", json={})
     assert resp.status_code != 404, resp.text

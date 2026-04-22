@@ -11,9 +11,9 @@ from fastapi import APIRouter, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from schemas.order import OrderEstado
+from schemas.order import EstadoOrden
 from storage.immutable_log import registrar
-from storage.postgres import execute, fetch_one
+from storage.postgres import execute, fetchrow
 
 router = APIRouter()
 
@@ -66,7 +66,7 @@ async def _procesar_resultado(external_ref: str, mp_status: str) -> JSONResponse
     pedido_id_str = partes[1]
 
     try:
-        pedido = await fetch_one(
+        pedido = await fetchrow(
             "SELECT id, estado, session_id FROM pedidos WHERE id = $1::uuid",
             pedido_id_str,
         )
@@ -77,7 +77,7 @@ async def _procesar_resultado(external_ref: str, mp_status: str) -> JSONResponse
         return JSONResponse({"ok": False, "detail": "Pedido no encontrado"}, status_code=404)
 
     nuevo_estado = (
-        OrderEstado.CONFIRMADO if mp_status == "approved" else OrderEstado.FALLIDO
+        EstadoOrden.PAGADA.value if mp_status == "approved" else EstadoOrden.FALLIDA.value
     )
 
     await execute(

@@ -11,9 +11,10 @@ import json
 from agno.agent import Agent
 
 from agents.inventory_agent import crear_agente_inventario
-from agents.orders_agent import crear_agente_pedidos
+from agents.orders_agent import crear_agente_orders
 from agents.router_agent import crear_agente_router
-from agents.sommelier_agent import crear_agente_sumiller
+from agents.sommelier_agent import crear_agente_sommelier
+from agents.support_agent import crear_agente_support
 from core.stuck_state import StuckStateDetector
 from schemas.agent_io import (
     AgentResponse,
@@ -27,12 +28,12 @@ MAX_STEPS = 5
 MIN_CONFIANZA = 0.85
 
 AGENTE_MAP: dict[str, str] = {
-    IntentClass.RECOMENDACION: "agente_sumiller",
-    IntentClass.MARIDAJE: "agente_sumiller",
+    IntentClass.RECOMENDACION: "agente_sommelier",
+    IntentClass.MARIDAJE: "agente_sommelier",
     IntentClass.CONSULTA_INVENTARIO: "agente_inventario",
-    IntentClass.PEDIDO: "agente_pedidos",
-    IntentClass.SOPORTE: "agente_sumiller",
-    IntentClass.EVENTO: "agente_sumiller",
+    IntentClass.PEDIDO: "agente_orders",
+    IntentClass.SOPORTE: "agente_support",
+    IntentClass.EVENTO: "agente_support",
     IntentClass.DESCONOCIDO: None,
 }
 
@@ -53,8 +54,9 @@ class Orchestrator:
         self._router = crear_agente_router()
         self._agentes: dict[str, Agent] = {
             "agente_inventario": crear_agente_inventario(),
-            "agente_sumiller": crear_agente_sumiller(),
-            "agente_pedidos": crear_agente_pedidos(),
+            "agente_sommelier": crear_agente_sommelier(),
+            "agente_orders": crear_agente_orders(),
+            "agente_support": crear_agente_support(),
         }
 
     async def procesar(self, request: SessionRequest, state: SessionState) -> AgentResponse:
@@ -153,7 +155,7 @@ class Orchestrator:
         Maneja el flujo de pedido iniciando Fase 1 del Two-Phase Commit.
         El agente de Pedidos extrae los ítems y llama a ejecutar_fase_1.
         """
-        agente = self._agentes.get("agente_pedidos")
+        agente = self._agentes.get("agente_orders")
         if not agente:
             return AgentResponse(
                 session_id=request.session_id,
@@ -180,7 +182,7 @@ class Orchestrator:
                 session_id=request.session_id,
                 correlation_id=request.correlation_id,
                 respuesta=respuesta,
-                agente="agente_pedidos",
+                agente="agente_orders",
                 intencion=router_output.intencion,
                 requiere_aprobacion=True,
                 finalizado=False,
@@ -190,7 +192,7 @@ class Orchestrator:
                 session_id=request.session_id,
                 correlation_id=request.correlation_id,
                 respuesta=RESPUESTA_FALLBACK,
-                agente="agente_pedidos",
+                agente="agente_orders",
                 intencion=router_output.intencion,
                 metadata={"error": str(e)},
                 finalizado=True,

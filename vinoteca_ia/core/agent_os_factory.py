@@ -48,7 +48,7 @@ TEAM_FACTORIES: list[Callable[[], Team]] = [
     crear_router_team,
 ]
 
-_DEFAULT_PUBLIC_PATHS = ("/health", "/chat")
+_DEFAULT_PUBLIC_PATHS = ("/health", "/chat", "/webhook")
 _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
 
 
@@ -154,7 +154,7 @@ def build_agent_os(*, base_app: FastAPI) -> AgentOS:
       si AgentOS intenta registrar el mismo path.
     - `InternalPathsGuard` sobre `base_app`: AgentOS solo responde a
       loopback, mientras que los paths en `AGENTOS_PUBLIC_PATHS` (default
-      `/health`, `/chat`) quedan expuestos.
+      `/health`, `/chat`, `/webhook`) quedan expuestos.
     """
     authorization, authorization_config = _authorization_settings()
 

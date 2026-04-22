@@ -4,33 +4,55 @@ Verifican invariantes críticos del modelo de dominio.
 """
 
 import uuid
+from decimal import Decimal
 
 import pytest
 from pydantic import ValidationError
 
-from schemas.agent_io import IntentClass, RouterOutput
-from schemas.order import Order, OrderEstado, TipoEntrega
+from schemas.agent_io import AgenteDestino, IntentClass, RouterOutput
+from schemas.order import EstadoOrden, Order, OrderLine
 from schemas.session_state import SessionState
-from schemas.wine_catalog import PrecioInfo, StockInfo, WineModel
+from schemas.wine_catalog import StockInfo, Varietal, WineProduct
 
 
-# ── WineModel ──────────────────────────────────────────────────────────
+# ── WineProduct ─────────────────────────────────────────────────────────
 def test_wine_precio_positivo():
-    vid = uuid.uuid4()
-    wine = WineModel(
-        id=vid, nombre="Test", bodega="Bodega", varietal="Malbec", precio=1500.0
+    wine = WineProduct(
+        vino_id=uuid.uuid4(),
+        nombre="Test",
+        bodega="Bodega",
+        varietal=Varietal.MALBEC,
+        region="Mendoza",
+        precio_ars=Decimal("1500.00"),
+        anada_actual=2020,
     )
-    assert wine.precio == 1500.0
+    assert wine.precio_ars == Decimal("1500.00")
 
 
 def test_wine_precio_cero_invalido():
     with pytest.raises(ValidationError):
-        WineModel(id=uuid.uuid4(), nombre="X", bodega="B", varietal="V", precio=0.0)
+        WineProduct(
+            vino_id=uuid.uuid4(),
+            nombre="X",
+            bodega="B",
+            varietal=Varietal.MALBEC,
+            region="R",
+            precio_ars=Decimal("0.00"),
+            anada_actual=2020,
+        )
 
 
 def test_wine_precio_negativo_invalido():
     with pytest.raises(ValidationError):
-        WineModel(id=uuid.uuid4(), nombre="X", bodega="B", varietal="V", precio=-100.0)
+        WineProduct(
+            vino_id=uuid.uuid4(),
+            nombre="X",
+            bodega="B",
+            varietal=Varietal.MALBEC,
+            region="R",
+            precio_ars=Decimal("-100.00"),
+            anada_actual=2020,
+        )
 
 
 # ── StockInfo ──────────────────────────────────────────────────────────
@@ -46,28 +68,39 @@ def test_stock_info_no_disponible():
 
 
 # ── Order ──────────────────────────────────────────────────────────────
+def _linea_ejemplo() -> OrderLine:
+    vid = uuid.uuid4()
+    return OrderLine(
+        vino_id=vid,
+        nombre_vino="Test",
+        cantidad=1,
+        precio_unitario_ars=Decimal("1000.00"),
+        subtotal_ars=Decimal("1000.00"),
+    )
+
+
 def test_order_total_negativo_invalido():
     with pytest.raises(ValidationError):
         Order(
-            id=uuid.uuid4(),
             session_id="sess_test",
-            estado=OrderEstado.PREPARANDO,
-            tipo_entrega=TipoEntrega.RETIRO,
             idempotency_key="key_test",
-            total=-100.0,
+            lineas=[_linea_ejemplo()],
+            subtotal_ars=Decimal("-100.00"),
+            envio_ars=Decimal("0.00"),
+            total_ars=Decimal("-100.00"),
         )
 
 
-def test_order_estado_enum():
+def test_order_estado_default():
     order = Order(
-        id=uuid.uuid4(),
         session_id="sess_test",
-        estado=OrderEstado.PENDIENTE_APROBACION,
-        tipo_entrega=TipoEntrega.RETIRO,
         idempotency_key="key_test",
-        total=5000.0,
+        lineas=[_linea_ejemplo()],
+        subtotal_ars=Decimal("1000.00"),
+        envio_ars=Decimal("0.00"),
+        total_ars=Decimal("1000.00"),
     )
-    assert order.estado == "pendiente_aprobacion"
+    assert order.estado == EstadoOrden.PREPARADA
 
 
 # ── RouterOutput ───────────────────────────────────────────────────────
@@ -75,7 +108,8 @@ def test_router_output_confianza_rango():
     r = RouterOutput(
         intencion=IntentClass.RECOMENDACION,
         confianza=0.95,
-        agente_destino="agente_sumiller",
+        agente_destino=AgenteDestino.SOMMELIER,
+        razonamiento="Cliente pide recomendación clara.",
     )
     assert r.confianza == 0.95
 
@@ -85,14 +119,15 @@ def test_router_output_confianza_fuera_rango():
         RouterOutput(
             intencion=IntentClass.RECOMENDACION,
             confianza=1.5,
-            agente_destino="agente_sumiller",
+            agente_destino=AgenteDestino.SOMMELIER,
+            razonamiento="Confianza fuera de rango (test).",
         )
 
 
 # ── SessionState ───────────────────────────────────────────────────────
 def test_session_state_inmutabilidad():
     state = SessionState(session_id="s1", correlation_id="c1")
-    new_state = state.agregar_turno("user", "Hola")
+    new_state = state.con_turno("user", "Hola")
     assert len(new_state.historial) == 1
     assert len(state.historial) == 0  # original sin mutar
 
@@ -100,13 +135,9 @@ def test_session_state_inmutabilidad():
 def test_session_state_ultimos_turnos():
     state = SessionState(session_id="s1", correlation_id="c1")
     for i in range(12):
-        state = state.agregar_turno("user", f"msg {i}")
+        state = state.con_turno("user", f"msg {i}")
     ultimos = state.ultimos_turnos(8)
     assert len(ultimos) == 8
     assert ultimos[-1].contenido == "msg 11"
 
 
-# ── PrecioInfo ─────────────────────────────────────────────────────────
-def test_precio_info_valido():
-    p = PrecioInfo(vino_id=uuid.uuid4(), nombre="Vino", precio=3500.0)
-    assert p.moneda == "ARS"

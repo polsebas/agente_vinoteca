@@ -52,6 +52,32 @@ class RouterOutput(BaseModel):
     )
 
 
+class SessionRequest(BaseModel):
+    """Mensaje entrante al orquestador (canal → router)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    session_id: str
+    correlation_id: str
+    mensaje: str = Field(..., min_length=1)
+    cliente_id: str | None = None
+
+
+class AgentResponse(BaseModel):
+    """Salida unificada del orquestador hacia la capa de transporte."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    session_id: str
+    correlation_id: str
+    respuesta: str
+    agente: str
+    intencion: IntentClass
+    finalizado: bool = True
+    metadata: dict[str, str] | None = None
+    requiere_aprobacion: bool = False
+
+
 class VinoSugerido(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

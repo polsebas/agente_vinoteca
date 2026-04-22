@@ -24,6 +24,7 @@ from api.routes.approve import router as approve_router
 from api.routes.audit import router as audit_router
 from api.routes.chat import router as chat_router
 from api.routes.health import router as health_router
+from api.routes.webhook import router as webhook_router
 from core.agent_os_factory import build_agent_os
 from storage.migrations import ensure_all_migrations
 from storage.postgres import close_pool, get_agno_db, get_pool
@@ -63,6 +64,7 @@ def create_base_app() -> FastAPI:
     )
     app.include_router(health_router)
     app.include_router(chat_router)
+    app.include_router(webhook_router)
     app.include_router(approve_router)
     app.include_router(audit_router)
     return app
