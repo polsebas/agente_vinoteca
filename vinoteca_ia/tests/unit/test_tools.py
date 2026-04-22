@@ -48,8 +48,9 @@ async def test_consultar_stock_vacio():
 @pytest.mark.asyncio
 async def test_consultar_stock_no_usa_rag():
     """Verifica que consultar_stock no importa ni llama a retriever."""
-    import tools.catalog.consult_stock as module
     import inspect
+
+    import tools.catalog.consult_stock as module
     source = inspect.getsource(module)
     assert "retriever" not in source
     assert "vector" not in source.lower() or "pgvector" not in source.lower()

@@ -7,12 +7,11 @@ Implementa: circuit breaker (max_steps), stuck state, graceful fallback.
 from __future__ import annotations
 
 import json
-import os
 
 from agno.agent import Agent
 
 from agents.inventory_agent import crear_agente_inventario
-from agents.orders_agent import crear_agente_pedidos, ejecutar_fase_1
+from agents.orders_agent import crear_agente_pedidos
 from agents.router_agent import crear_agente_router
 from agents.sommelier_agent import crear_agente_sumiller
 from core.stuck_state import StuckStateDetector
@@ -66,7 +65,7 @@ class Orchestrator:
         3. Aplica circuit breaker y stuck state.
         4. Retorna AgentResponse estructurada.
         """
-        stuck_detector = StuckStateDetector()
+        StuckStateDetector()
 
         router_output = await self._clasificar(request.mensaje)
 

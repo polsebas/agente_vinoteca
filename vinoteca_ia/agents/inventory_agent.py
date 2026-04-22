@@ -10,7 +10,6 @@ import os
 from agno.agent import Agent
 from agno.models.anthropic import Claude
 
-from schemas.tool_responses import PriceQueryResult, StockQueryResult
 from tools.catalog.consult_price import consultar_precio
 from tools.catalog.consult_stock import consultar_stock
 

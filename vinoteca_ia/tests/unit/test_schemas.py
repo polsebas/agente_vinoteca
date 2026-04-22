@@ -9,8 +9,8 @@ import pytest
 from pydantic import ValidationError
 
 from schemas.agent_io import IntentClass, RouterOutput
-from schemas.order import Order, OrderEstado, OrderLine, TipoEntrega
-from schemas.session_state import SessionState, TurnoHistorial
+from schemas.order import Order, OrderEstado, TipoEntrega
+from schemas.session_state import SessionState
 from schemas.wine_catalog import PrecioInfo, StockInfo, WineModel
 
 

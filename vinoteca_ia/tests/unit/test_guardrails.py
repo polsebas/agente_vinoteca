@@ -3,7 +3,6 @@ Tests unitarios para guardrails de entrada.
 Verifican que PII y jailbreak son detectados correctamente.
 """
 
-import pytest
 
 from core.guardrails import verificar_entrada
 

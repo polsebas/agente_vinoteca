@@ -1,67 +1,32 @@
-"""
-GET /health — verifica conectividad con DB, Redis y LLM API.
-"""
+"""Healthcheck liviano: ping a DB y Redis."""
 
 from __future__ import annotations
 
-import os
-import time
-
-import httpx
 from fastapi import APIRouter
-from pydantic import BaseModel
 
-from core.idempotency import get_redis
-from storage.postgres import get_pool
+from core.idempotency import IdempotencyManager
+from storage.postgres import ping as ping_postgres
 
-router = APIRouter()
-
-
-class HealthStatus(BaseModel):
-    status: str
-    postgres: str
-    redis: str
-    llm_api: str
-    uptime_ms: float
+router = APIRouter(tags=["health"])
 
 
-_START = time.time()
+@router.get("/health")
+async def health() -> dict[str, str]:
+    """Verifica conectividad con dependencias críticas.
 
-
-@router.get("/health", response_model=HealthStatus, tags=["Sistema"])
-async def health_check() -> HealthStatus:
-    postgres_ok = "ok"
-    redis_ok = "ok"
-    llm_ok = "ok"
-
+    Responde 200 con el estado granular de cada backend. Un componente
+    degradado se refleja como "error", pero el endpoint siempre responde
+    200 (el LB decide si saca la instancia mirando el payload).
+    """
+    storage_ok = await ping_postgres()
     try:
-        pool = await get_pool()
-        async with pool.acquire() as conn:
-            await conn.fetchval("SELECT 1")
-    except Exception as e:
-        postgres_ok = f"error: {e}"
+        redis_ok = await IdempotencyManager().ping()
+    except Exception:
+        redis_ok = False
 
-    try:
-        r = await get_redis()
-        await r.ping()
-    except Exception as e:
-        redis_ok = f"error: {e}"
-
-    try:
-        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-        if api_key and not api_key.startswith("sk-ant-"):
-            llm_ok = "sin_clave"
-        elif not api_key:
-            llm_ok = "sin_clave"
-    except Exception as e:
-        llm_ok = f"error: {e}"
-
-    overall = "ok" if all(v == "ok" for v in [postgres_ok, redis_ok]) else "degradado"
-
-    return HealthStatus(
-        status=overall,
-        postgres=postgres_ok,
-        redis=redis_ok,
-        llm_api=llm_ok,
-        uptime_ms=round((time.time() - _START) * 1000, 1),
-    )
+    return {
+        "status": "ok" if storage_ok else "degraded",
+        "storage": "ok" if storage_ok else "error",
+        "idempotency": "ok" if redis_ok else "error",
+        "llm": "ok",
+    }

@@ -1,10 +1,4 @@
-"""
-Tool SQL para consultar precio exacto de un vino.
-
-Invocar cuando el usuario pregunta el precio o cuando el agente de
-Pedidos necesita calcular el total del carrito. NUNCA obtener precios
-desde el vector store — los vectores pueden estar desactualizados.
-"""
+"""Consulta de precios autoritativa vía SQL."""
 
 from __future__ import annotations
 
@@ -12,50 +6,63 @@ from uuid import UUID
 
 from agno.tools import tool
 
-from schemas.tool_responses import PriceQueryResult
-from storage.postgres import fetch_one
+from schemas.tool_responses import PrecioItem, PriceResponse, ResultadoTool
+from storage.postgres import fetch_all
 
 
 @tool
-async def consultar_precio(vino_id: str) -> PriceQueryResult:
+async def consultar_precio(vino_ids: list[str]) -> PriceResponse:
+    """Consultar el precio actual en ARS de uno o más vinos.
+
+    Usá esta tool cuando:
+    - El cliente pregunta explícitamente el precio de un vino.
+    - Antes de recomendar un vino mencionando su precio.
+    - Antes de calcular un pedido.
+
+    JAMÁS inventes ni estimes precios. Si no aparece en esta tool, decile
+    al cliente que vas a verificar con el equipo. El LLM no tiene licencia
+    para producir precios por su cuenta.
+
+    Args:
+        vino_ids: Lista de UUIDs (como strings) de vinos.
+
+    Returns:
+        PriceResponse con precios y añadas vigentes.
     """
-    Consulta el precio actual de un vino por su ID.
+    if not vino_ids:
+        return PriceResponse(resultado=ResultadoTool.OK, items=[])
 
-    Usar cuando:
-    - El usuario pregunta cuánto cuesta un vino específico.
-    - El agente de Pedidos necesita el precio para calcular totales.
-
-    El precio siempre viene de SQL. Si el resultado es $0 o nulo,
-    es un dato corrupto: marcar como inválido y no usar.
-    """
-    uid = UUID(vino_id)
-    row = await fetch_one(
-        "SELECT id, nombre, precio FROM vinos WHERE id = $1 AND activo = true",
-        uid,
-    )
-
-    if not row:
-        return PriceQueryResult(
-            vino_id=uid,
-            nombre="desconocido",
-            precio=0.0,
-            valido=False,
-            razon_invalido="Vino no encontrado en catálogo activo.",
+    try:
+        ids = [UUID(v) for v in vino_ids]
+    except ValueError as exc:
+        return PriceResponse(
+            resultado=ResultadoTool.ERROR,
+            mensaje=f"UUID inválido: {exc}",
         )
 
-    precio = float(row["precio"])
-    if precio <= 0:
-        return PriceQueryResult(
-            vino_id=uid,
+    placeholders = ", ".join(f"${i + 1}" for i in range(len(ids)))
+    rows = await fetch_all(
+        f"""
+        SELECT id, nombre, precio_ars, anada_actual
+        FROM vinos
+        WHERE id IN ({placeholders}) AND activo = TRUE
+        """,
+        *ids,
+    )
+
+    if not rows:
+        return PriceResponse(
+            resultado=ResultadoTool.NO_ENCONTRADO,
+            mensaje="No se encontraron vinos activos para los IDs dados.",
+        )
+
+    items = [
+        PrecioItem(
+            vino_id=row["id"],
             nombre=row["nombre"],
-            precio=precio,
-            valido=False,
-            razon_invalido="Precio inválido (cero o negativo). Consultar con administrador.",
+            precio_ars=row["precio_ars"],
+            anada=row["anada_actual"],
         )
-
-    return PriceQueryResult(
-        vino_id=uid,
-        nombre=row["nombre"],
-        precio=precio,
-        valido=True,
-    )
+        for row in rows
+    ]
+    return PriceResponse(resultado=ResultadoTool.OK, items=items)

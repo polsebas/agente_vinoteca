@@ -8,7 +8,6 @@ Uso: python scripts/enrich_catalog.py
 from __future__ import annotations
 
 import asyncio
-import os
 
 from dotenv import load_dotenv
 

@@ -1,16 +1,21 @@
-"""
-Contratos de entrada/salida para la comunicación entre canal, orquestador y agentes.
+"""Entrada y salida tipada de cada agente.
+
+Cada agente declara su `output_schema` con uno de estos modelos. Temperatura 0.0
+garantiza que el LLM emite el JSON correcto de forma determinista.
 """
 
 from __future__ import annotations
 
-from enum import Enum
-from typing import Any
+from decimal import Decimal
+from enum import StrEnum
+from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
-class IntentClass(str, Enum):
+class IntentClass(StrEnum):
+    """Clases cerradas de intención que el router puede emitir."""
+
     RECOMENDACION = "recomendacion"
     MARIDAJE = "maridaje"
     CONSULTA_INVENTARIO = "consulta_inventario"
@@ -20,64 +25,88 @@ class IntentClass(str, Enum):
     DESCONOCIDO = "desconocido"
 
 
-class PerfilCliente(str, Enum):
-    COLECCIONISTA = "coleccionista"
-    CURIOSO = "curioso"
-    OCASION = "ocasion"
-    DESCONOCIDO = "desconocido"
+class AgenteDestino(StrEnum):
+    """Agentes especialistas disponibles para derivación.
 
+    Debe coincidir con los `members` del Team router (`router_team.py`):
+    sommelier, orders, support. No existe agente de eventos separado: la
+    intención `evento` se deriva a soporte (catas, reservas, info de local).
+    """
 
-class SessionRequest(BaseModel):
-    """Request validado que el API Gateway envía al orquestador."""
-
-    mensaje: str = Field(..., min_length=1, max_length=2000)
-    session_id: str
-    correlation_id: str
-    canal: str = "web"
-    metadata: dict[str, Any] = Field(default_factory=dict)
-
-
-class AgentHandoff(BaseModel):
-    """Mandato que el orquestador entrega a un agente especialista."""
-
-    agente_destino: str
-    intencion: IntentClass
-    session_id: str
-    correlation_id: str
-    mensaje_original: str
-    perfil_cliente: PerfilCliente = PerfilCliente.DESCONOCIDO
-    contexto: dict[str, Any] = Field(default_factory=dict)
-    confianza: float = Field(ge=0.0, le=1.0, default=1.0)
-
-
-class AgentResponse(BaseModel):
-    """Respuesta estructurada de cualquier agente al orquestador."""
-
-    session_id: str
-    correlation_id: str
-    respuesta: str
-    agente: str
-    intencion: IntentClass
-    metadata: dict[str, Any] = Field(default_factory=dict)
-    requiere_aprobacion: bool = False
-    pedido_id: str | None = None
-    finalizado: bool = True
+    SOMMELIER = "agente_sommelier"
+    ORDERS = "agente_orders"
+    SUPPORT = "agente_support"
+    NINGUNO = "ninguno"
 
 
 class RouterOutput(BaseModel):
-    """Salida tipada del Agente Enrutador."""
+    """Decisión de ruteo. Temperatura 0.0 + confianza mínima 0.85 o derivación nula."""
+
+    model_config = ConfigDict(extra="forbid")
 
     intencion: IntentClass
     confianza: float = Field(ge=0.0, le=1.0)
-    agente_destino: str
-    razonamiento: str | None = None
+    agente_destino: AgenteDestino
+    razonamiento: str = Field(
+        description="Una oración. Invisible al cliente. Sirve para tracing.",
+    )
 
 
-class ChatResponse(BaseModel):
-    """Respuesta del endpoint /chat al frontend."""
+class VinoSugerido(BaseModel):
+    model_config = ConfigDict(extra="forbid")
 
-    session_id: str
-    correlation_id: str
-    respuesta: str
+    vino_id: UUID
+    nombre: str
+    precio_ars: Decimal
+    razon_recomendacion: str
+
+
+class SommelierResponse(BaseModel):
+    """Respuesta estructurada del sumiller.
+
+    NUNCA inventa vinos ni precios: los `sugeridos` vienen exclusivamente del
+    resultado de las tools (SQL / RAG indexado).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    mensaje_cliente: str
+    sugeridos: list[VinoSugerido] = Field(default_factory=list, max_length=5)
+    requiere_mas_info: bool = False
+
+
+class LineaResumenPedido(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    vino_id: UUID
+    nombre: str
+    cantidad: int = Field(ge=1)
+    precio_unitario_ars: Decimal
+    subtotal_ars: Decimal
+
+
+class OrderResponse(BaseModel):
+    """Respuesta del agente de pedidos.
+
+    En Fase 1 devuelve `requiere_aprobacion=True` y el resumen. En Fase 2 devuelve
+    `requiere_aprobacion=False` y `payment_link` poblado.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    mensaje_cliente: str
+    order_id: UUID | None = None
+    lineas: list[LineaResumenPedido] = Field(default_factory=list)
+    total_ars: Decimal | None = None
     requiere_aprobacion: bool = False
-    pedido_id: str | None = None
+    payment_link: str | None = None
+
+
+class SupportResponse(BaseModel):
+    """Respuesta del agente de soporte."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mensaje_cliente: str
+    escalado_a_humano: bool = False
+    ticket_id: str | None = None

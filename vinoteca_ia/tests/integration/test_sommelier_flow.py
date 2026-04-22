@@ -11,7 +11,6 @@ from uuid import uuid4
 
 import pytest
 
-from schemas.agent_io import IntentClass, SessionRequest
 from schemas.session_state import SessionState
 from schemas.tool_responses import RAGResult, StockQueryResult
 from schemas.wine_catalog import StockInfo
@@ -27,7 +26,7 @@ async def test_flujo_sumiller_recomendacion_con_stock():
     session_id = f"sess_test_{uuid4().hex[:6]}"
     correlation_id = f"sess_test_{uuid4().hex[:6]}"
 
-    rag_result = [
+    [
         RAGResult(
             vino_id=vino_id,
             nombre_vino="Zuccardi Valle de Uco",
@@ -37,7 +36,7 @@ async def test_flujo_sumiller_recomendacion_con_stock():
         )
     ]
 
-    stock_result = StockQueryResult(
+    StockQueryResult(
         items=[
             StockInfo(
                 vino_id=vino_id,
@@ -86,7 +85,7 @@ async def test_flujo_sumiller_sin_stock_no_recomienda():
     Si todos los candidatos tienen stock 0, el sumiller no debe recomendar ninguno.
     """
     vino_id = uuid4()
-    session_id = f"sess_test_{uuid4().hex[:6]}"
+    f"sess_test_{uuid4().hex[:6]}"
 
     stock_sin_disponibilidad = StockQueryResult(
         items=[

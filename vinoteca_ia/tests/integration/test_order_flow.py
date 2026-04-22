@@ -110,6 +110,5 @@ async def test_order_tipo_entrega():
     from tools.orders.calculate_order import COSTO_ENVIO
     assert COSTO_ENVIO > 0
 
-    from schemas.order import TipoEntrega
     assert TipoEntrega.RETIRO == "retiro"
     assert TipoEntrega.ENVIO == "envio"

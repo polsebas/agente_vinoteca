@@ -1,76 +1,91 @@
-"""
-Tool SQL para calcular el total del pedido en Fase 1 (sin mutaciones).
-
-Invocar después de verificar_stock_exacto y ANTES de presentar el
-resumen al cliente. Esta tool NO escribe en base de datos.
-"""
+"""Cálculo determinista de totales (sin LLM)."""
 
 from __future__ import annotations
 
+from decimal import Decimal
 from uuid import UUID
 
 from agno.tools import tool
 
-from schemas.order import TipoEntrega
-from schemas.tool_responses import OrderCalculation
+from schemas.tool_responses import CalculationResponse, ResultadoTool
 from storage.postgres import fetch_all
-
-COSTO_ENVIO = 500.0
 
 
 @tool
-async def calcular_pedido(items: list[dict], tipo_entrega: str = "retiro") -> OrderCalculation:
+async def calcular_orden(
+    lineas: list[dict[str, str | int]],
+    costo_envio_ars: float = 0.0,
+) -> CalculationResponse:
+    """Calcular subtotal, envío y total de un pedido usando precios actuales de SQL.
+
+    Usá esta tool como segundo paso del armado de un pedido, después de
+    `verificar_stock_exacto` y antes de `crear_orden`. El cálculo es puramente
+    aritmético: NUNCA dejes que el LLM sume precios por su cuenta.
+
+    Los precios se toman autoritativamente de la tabla `vinos`: si cambiaron
+    entre el momento de la recomendación y el armado, el total se recalcula
+    con los vigentes.
+
+    Args:
+        lineas: Lista de `{"vino_id": "<uuid>", "cantidad": <int>}`.
+        costo_envio_ars: Costo de envío a agregar al subtotal.
+
+    Returns:
+        CalculationResponse con `subtotal_ars`, `envio_ars`, `total_ars`.
     """
-    Calcula el total del pedido a partir de precios actuales en SQL.
-    NO modifica stock ni crea registros. Solo lectura.
+    if not lineas:
+        return CalculationResponse(
+            resultado=ResultadoTool.ERROR,
+            subtotal_ars=Decimal("0"),
+            envio_ars=Decimal("0"),
+            total_ars=Decimal("0"),
+            mensaje="Debe proveer al menos una línea.",
+        )
 
-    Usar después de verificar_stock_exacto y antes de presentar el
-    resumen de confirmación al cliente en Fase 1.
+    try:
+        requested: dict[UUID, int] = {
+            UUID(str(line["vino_id"])): int(line["cantidad"])
+            for line in lineas
+        }
+    except (KeyError, ValueError) as exc:
+        return CalculationResponse(
+            resultado=ResultadoTool.ERROR,
+            subtotal_ars=Decimal("0"),
+            envio_ars=Decimal("0"),
+            total_ars=Decimal("0"),
+            mensaje=f"Líneas mal formadas: {exc}",
+        )
 
-    Parámetros:
-        items: Lista de {vino_id: str, cantidad: int}
-        tipo_entrega: "retiro" | "envio"
-    """
-    if not items:
-        return OrderCalculation(lineas=[], subtotal=0.0, total=0.0, tipo_entrega=tipo_entrega)
-
-    ids = [UUID(item["vino_id"]) for item in items]
-    cantidades = {UUID(item["vino_id"]): item["cantidad"] for item in items}
-    placeholders = ", ".join(f"${i+1}" for i in range(len(ids)))
-
+    placeholders = ", ".join(f"${i + 1}" for i in range(len(requested)))
     rows = await fetch_all(
-        f"SELECT id, nombre, precio FROM vinos WHERE id IN ({placeholders}) AND activo = true",
-        *ids,
+        f"""
+        SELECT id, precio_ars
+        FROM vinos
+        WHERE id IN ({placeholders}) AND activo = TRUE
+        """,
+        *requested.keys(),
     )
 
-    advertencias = []
-    lineas = []
-    subtotal = 0.0
+    precios: dict[UUID, Decimal] = {row["id"]: row["precio_ars"] for row in rows}
+    if len(precios) != len(requested):
+        return CalculationResponse(
+            resultado=ResultadoTool.ERROR,
+            subtotal_ars=Decimal("0"),
+            envio_ars=Decimal("0"),
+            total_ars=Decimal("0"),
+            mensaje="Uno o más vinos no existen o están inactivos.",
+        )
 
-    for row in rows:
-        precio = float(row["precio"])
-        if precio <= 0:
-            advertencias.append(f"Precio inválido para {row['nombre']}. Omitido del cálculo.")
-            continue
-        cantidad = cantidades.get(row["id"], 0)
-        subtotal_linea = precio * cantidad
-        lineas.append({
-            "vino_id": str(row["id"]),
-            "nombre": row["nombre"],
-            "cantidad": cantidad,
-            "precio_unitario": precio,
-            "subtotal": subtotal_linea,
-        })
-        subtotal += subtotal_linea
-
-    envio = COSTO_ENVIO if tipo_entrega == TipoEntrega.ENVIO else 0.0
+    subtotal = sum(
+        (precios[vid] * Decimal(cantidad) for vid, cantidad in requested.items()),
+        start=Decimal("0"),
+    )
+    envio = Decimal(str(costo_envio_ars))
     total = subtotal + envio
 
-    return OrderCalculation(
-        lineas=lineas,
-        subtotal=round(subtotal, 2),
-        envio=round(envio, 2),
-        total=round(total, 2),
-        tipo_entrega=tipo_entrega,
-        advertencias=advertencias,
+    return CalculationResponse(
+        resultado=ResultadoTool.OK,
+        subtotal_ars=subtotal.quantize(Decimal("0.01")),
+        envio_ars=envio.quantize(Decimal("0.01")),
+        total_ars=total.quantize(Decimal("0.01")),
     )

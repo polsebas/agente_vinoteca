@@ -1,63 +1,82 @@
-"""
-Modelos Pydantic del catálogo de vinos y sus cinco capas de conocimiento.
-"""
+"""Modelos de catálogo de vinos. Fuente de verdad: SQL (no RAG)."""
 
 from __future__ import annotations
 
+from decimal import Decimal
+from enum import StrEnum
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 
-class WineKnowledge(BaseModel):
-    """Las cinco capas de conocimiento cualitativo de un vino (solo para RAG)."""
+class Varietal(StrEnum):
+    MALBEC = "malbec"
+    CABERNET_SAUVIGNON = "cabernet_sauvignon"
+    PINOT_NOIR = "pinot_noir"
+    MERLOT = "merlot"
+    CHARDONNAY = "chardonnay"
+    SAUVIGNON_BLANC = "sauvignon_blanc"
+    TORRONTES = "torrontes"
+    BONARDA = "bonarda"
+    TANNAT = "tannat"
+    ROSADO = "rosado"
+    ESPUMANTE = "espumante"
+    OTRO = "otro"
 
-    capa_1_dato_duro: str | None = None
-    capa_2_terruño: str | None = None
-    capa_3_historia: str | None = None
-    capa_4_tendencia: str | None = None
-    capa_5_voz_propia: str | None = None
+
+class PerfilMaridaje(BaseModel):
+    """Maridajes recomendados del vino. Datos cualitativos, alimentan el RAG."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    carnes_rojas: bool = False
+    carnes_blancas: bool = False
+    pescados: bool = False
+    pastas: bool = False
+    quesos: bool = False
+    postres: bool = False
+    aperitivo: bool = False
+    notas_libres: str | None = Field(
+        default=None,
+        description="Descripción narrativa del maridaje, indexada en RAG",
+    )
 
 
-class WineModel(BaseModel):
-    """Representación completa de un vino del catálogo."""
+class InfoAnada(BaseModel):
+    """Información específica de una añada."""
 
-    id: UUID
+    model_config = ConfigDict(extra="forbid")
+
+    anada: int = Field(ge=1900, le=2100)
+    puntaje_critico: int | None = Field(default=None, ge=0, le=100)
+    notas_cata: str | None = None
+    potencial_guarda_anos: int | None = Field(default=None, ge=0, le=100)
+
+
+class WineProduct(BaseModel):
+    """Vino del catálogo. Inmutable desde el punto de vista del agente."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    vino_id: UUID
     nombre: str
     bodega: str
-    varietal: str
-    cosecha: int | None = None
-    precio: float
+    varietal: Varietal
+    region: str
+    precio_ars: Decimal = Field(gt=0, decimal_places=2)
+    anada_actual: int = Field(ge=1900, le=2100)
     descripcion: str | None = None
-    region: str | None = None
-    sub_region: str | None = None
-    alcohol: float | None = None
-    maridajes: list[str] = Field(default_factory=list)
+    perfil_maridaje: PerfilMaridaje = Field(default_factory=PerfilMaridaje)
     activo: bool = True
-    conocimiento: WineKnowledge | None = None
-
-    @field_validator("precio")
-    @classmethod
-    def precio_positivo(cls, v: float) -> float:
-        if v <= 0:
-            raise ValueError("El precio debe ser mayor a cero.")
-        return v
 
 
 class StockInfo(BaseModel):
-    """Resultado de una consulta de stock. Siempre via SQL, nunca RAG."""
+    """Disponibilidad de un vino. Siempre SQL, nunca RAG."""
+
+    model_config = ConfigDict(extra="forbid")
 
     vino_id: UUID
     nombre: str
     disponible: bool
-    cantidad: int
+    cantidad: int = Field(ge=0)
     ubicacion: str = "deposito_principal"
-
-
-class PrecioInfo(BaseModel):
-    """Resultado de una consulta de precio. Siempre via SQL, nunca RAG."""
-
-    vino_id: UUID
-    nombre: str
-    precio: float
-    moneda: str = "ARS"

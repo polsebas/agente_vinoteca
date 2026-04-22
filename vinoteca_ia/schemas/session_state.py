@@ -1,57 +1,72 @@
-"""
-Estado inmutable de sesión. Nunca usar diccionarios libres para persistir contexto.
-"""
+"""Estado de sesión tipado. Nunca se persiste como dict libre."""
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any
+from datetime import UTC, datetime
+from enum import StrEnum
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
-from schemas.agent_io import IntentClass, PerfilCliente
+
+class Canal(StrEnum):
+    """Canal por el que entra el mensaje del cliente."""
+
+    WEB = "web"
+    WHATSAPP = "whatsapp"
+    PLAYGROUND = "playground"
+
+
+class EstadoPedidoPendiente(StrEnum):
+    """Estado del Two-Phase Commit para un pedido en curso."""
+
+    NINGUNO = "ninguno"
+    PREPARADO = "preparado"
+    APROBADO = "aprobado"
+    RECHAZADO = "rechazado"
 
 
 class TurnoHistorial(BaseModel):
-    """Un turno de conversación (usuario o agente)."""
+    """Un turno individual del diálogo."""
 
-    rol: str  # "user" | "assistant" | "tool"
+    rol: str
     contenido: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     agente: str | None = None
     tool_name: str | None = None
 
 
 class SessionState(BaseModel):
+    """Estado inmutable de la sesión de un cliente.
+
+    Se reconstruye en cada turno desde Postgres. Las mutaciones devuelven
+    copias nuevas (nunca in-place) para preservar inmutabilidad del estado
+    cognitivo del agente.
     """
-    Estado inmutable de sesión. No usar dicts libres.
-    Se persiste en sesiones_agente y se reconstruye en cada turno.
-    """
+
+    model_config = ConfigDict(frozen=False, extra="forbid")
 
     session_id: str
     correlation_id: str
-    canal: str = "web"
-    perfil_cliente: PerfilCliente = PerfilCliente.DESCONOCIDO
-    intencion_actual: IntentClass = IntentClass.DESCONOCIDO
+    cliente_id: str | None = None
+    canal: Canal = Canal.WEB
     historial: list[TurnoHistorial] = Field(default_factory=list)
     pedido_pendiente_id: UUID | None = None
-    metadata: dict[str, Any] = Field(default_factory=dict)
+    pedido_pendiente_estado: EstadoPedidoPendiente = EstadoPedidoPendiente.NINGUNO
+    run_id_pausado: str | None = None
     pasos_actuales: int = 0
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
-    def agregar_turno(self, rol: str, contenido: str, **kwargs: Any) -> "SessionState":
-        """Retorna una nueva instancia con el turno agregado (inmutabilidad)."""
-        nuevo_turno = TurnoHistorial(rol=rol, contenido=contenido, **kwargs)
+    def con_turno(self, rol: str, contenido: str, **kwargs: str) -> SessionState:
+        turno = TurnoHistorial(rol=rol, contenido=contenido, **kwargs)
         return self.model_copy(
             update={
-                "historial": self.historial + [nuevo_turno],
+                "historial": [*self.historial, turno],
                 "pasos_actuales": self.pasos_actuales + 1,
-                "updated_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(UTC),
             }
         )
 
     def ultimos_turnos(self, n: int = 8) -> list[TurnoHistorial]:
-        """Ventana deslizante de los últimos n turnos para el contexto del LLM."""
         return self.historial[-n:]

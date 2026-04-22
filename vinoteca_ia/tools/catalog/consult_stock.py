@@ -1,54 +1,59 @@
-"""
-Tool SQL para consultar disponibilidad de stock.
-
-Invocar cuando el usuario pregunta si un vino está disponible, cuántas
-unidades quedan, o antes de confirmar cualquier recomendación con intención
-de compra. NUNCA usar vectores para determinar stock.
-"""
+"""Consulta de stock autoritativa vía SQL."""
 
 from __future__ import annotations
 
 from uuid import UUID
 
 from agno.tools import tool
-from pydantic import BaseModel
 
-from schemas.tool_responses import StockQueryResult
+from schemas.tool_responses import ResultadoTool, StockResponse
 from schemas.wine_catalog import StockInfo
 from storage.postgres import fetch_all
 
 
-class ConsultarStockInput(BaseModel):
-    vino_ids: list[UUID]
-
-
 @tool
-async def consultar_stock(vino_ids: list[str]) -> StockQueryResult:
-    """
-    Consulta el stock actual de uno o varios vinos por su ID.
+async def consultar_stock(vino_ids: list[str]) -> StockResponse:
+    """Consultar disponibilidad y cantidad de uno o más vinos por su UUID.
 
-    Usar cuando:
-    - El Sumiller necesita verificar disponibilidad antes de recomendar.
-    - El cliente pregunta directamente si un vino está disponible.
-    - El agente de Pedidos verifica stock en Fase 1 del Two-Phase Commit.
+    Usá esta tool cuando:
+    - El cliente pregunta si un vino está disponible o cuántas unidades quedan.
+    - Antes de confirmar una recomendación con intención de compra.
+    - Antes de presentar un resumen de pedido al cliente.
 
-    Parámetros:
-        vino_ids: Lista de UUIDs de vinos a consultar.
+    NUNCA uses RAG/vectores para stock: la única fuente válida es esta tool.
+    Siempre llamá a esta tool antes de afirmar disponibilidad al cliente.
 
-    Nunca usar RAG para este propósito. La fuente es exclusivamente SQL.
+    Args:
+        vino_ids: Lista de UUIDs (como strings) de vinos a consultar.
+
+    Returns:
+        StockResponse con la lista de StockInfo y el flag `todos_disponibles`.
     """
     if not vino_ids:
-        return StockQueryResult(items=[], todos_disponibles=False)
+        return StockResponse(
+            resultado=ResultadoTool.OK,
+            items=[],
+            todos_disponibles=False,
+            mensaje="Sin IDs para consultar",
+        )
 
-    ids = [UUID(v) for v in vino_ids]
-    placeholders = ", ".join(f"${i+1}" for i in range(len(ids)))
+    try:
+        ids = [UUID(v) for v in vino_ids]
+    except ValueError as exc:
+        return StockResponse(
+            resultado=ResultadoTool.ERROR,
+            mensaje=f"UUID inválido: {exc}",
+        )
 
+    placeholders = ", ".join(f"${i + 1}" for i in range(len(ids)))
     rows = await fetch_all(
         f"""
-        SELECT v.id, v.nombre, s.cantidad, s.ubicacion
+        SELECT v.id, v.nombre,
+               COALESCE(s.cantidad, 0) AS cantidad,
+               COALESCE(s.ubicacion, 'deposito_principal') AS ubicacion
         FROM vinos v
         LEFT JOIN stock s ON s.vino_id = v.id
-        WHERE v.id IN ({placeholders}) AND v.activo = true
+        WHERE v.id IN ({placeholders}) AND v.activo = TRUE
         """,
         *ids,
     )
@@ -57,14 +62,14 @@ async def consultar_stock(vino_ids: list[str]) -> StockQueryResult:
         StockInfo(
             vino_id=row["id"],
             nombre=row["nombre"],
-            disponible=(row["cantidad"] or 0) > 0,
-            cantidad=row["cantidad"] or 0,
-            ubicacion=row["ubicacion"] or "deposito_principal",
+            disponible=row["cantidad"] > 0,
+            cantidad=row["cantidad"],
+            ubicacion=row["ubicacion"],
         )
         for row in rows
     ]
-
-    return StockQueryResult(
+    return StockResponse(
+        resultado=ResultadoTool.OK,
         items=items,
-        todos_disponibles=all(i.disponible for i in items),
+        todos_disponibles=bool(items) and all(i.disponible for i in items),
     )

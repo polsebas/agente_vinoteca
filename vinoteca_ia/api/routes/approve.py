@@ -1,106 +1,83 @@
-"""
-POST /pedido/{pedido_id}/aprobar — señal HitL que desbloquea la Fase 2 del Two-Phase Commit.
-Este endpoint es la única forma de ejecutar una transacción de compra.
+"""Aprobación humana de pedidos pausados (Fase 2 del 2PC).
+
+Cuando `/chat` emite un evento `paused`, un operador autorizado llama a este
+endpoint con `X-Approval-Token` para reanudar el Team.
+
+Contrato con Agno (validado contra `agno.team._tools._propagate_member_pause`):
+cuando una tool de un miembro lleva `requires_confirmation=True`, Agno propaga
+la `RunRequirement` al `TeamRunOutput`. Por eso el `run_id` del evento `paused`
+es el del Team, y la reanudación se hace sobre el Team (no sobre el miembro):
+internamente, `team.acontinue_run` agrupa requirements por `member_agent_id` y
+reanuda cada miembro. La vía correcta es mutar `run.requirements[*]` con
+`req.confirm()` / `req.reject(note=...)`, no mutar `run.tools`.
 """
 
 from __future__ import annotations
 
-from uuid import UUID
+import logging
 
-from fastapi import APIRouter, HTTPException, Request, status
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 
-from agents.orders_agent import ejecutar_fase_2
-from schemas.order import OrderEstado
-from storage.immutable_log import registrar
-from storage.postgres import execute, fetch_one
+from agents.router_team import crear_router_team
+from api.deps import approval_rate_limiter, require_approval_token
 
-router = APIRouter()
+logger = logging.getLogger("vinoteca.api.approve")
 
-
-class AprobacionRequest(BaseModel):
-    aprobado: bool = True
-    operador_id: str | None = None
-    notas: str | None = None
+router = APIRouter(tags=["orders"])
 
 
-class AprobacionResponse(BaseModel):
-    ok: bool
-    pedido_id: str
-    mensaje: str
-    url_pago: str | None = None
-    total: float | None = None
+class ApproveRequest(BaseModel):
+    """Decisión explícita del aprobador."""
+
+    aprobar: bool = Field(..., description="True para continuar, False para rechazar.")
+    session_id: str = Field(..., description="Session_id original del chat.")
+    nota: str | None = Field(default=None, description="Nota del aprobador.")
 
 
-@router.post("/pedido/{pedido_id}/aprobar", response_model=AprobacionResponse, tags=["Pedidos"])
-async def aprobar_pedido(
-    pedido_id: UUID,
-    body: AprobacionRequest,
-    request: Request,
-) -> AprobacionResponse:
-    """
-    Señal HitL para ejecutar la Fase 2 del Two-Phase Commit.
-    Solo puede activarse una vez por pedido. Idempotente por idempotency_key.
-    """
-    pedido = await fetch_one(
-        "SELECT id, estado, total, session_id, idempotency_key FROM pedidos WHERE id = $1",
-        pedido_id,
-    )
+@router.post(
+    "/pedido/{run_id}/aprobar",
+    dependencies=[Depends(require_approval_token), Depends(approval_rate_limiter)],
+)
+async def aprobar_pedido(run_id: str, req: ApproveRequest) -> dict:
+    """Reanudar un run pausado con la decisión humana."""
+    team = crear_router_team()
+    run = await team.aget_run_output(run_id=run_id, session_id=req.session_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail=f"run_id {run_id} no existe")
 
-    if not pedido:
+    requirements = getattr(run, "requirements", None) or []
+    pendientes = [r for r in requirements if getattr(r, "needs_confirmation", False)]
+    if not pendientes:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Pedido {pedido_id} no encontrado.",
+            status_code=409,
+            detail="El run no tiene requerimientos de confirmación pendientes.",
         )
 
-    if pedido["estado"] == OrderEstado.CONFIRMADO:
-        return AprobacionResponse(
-            ok=True,
-            pedido_id=str(pedido_id),
-            mensaje="Este pedido ya fue confirmado anteriormente.",
-            total=float(pedido["total"]) if pedido["total"] else None,
-        )
+    for requirement in pendientes:
+        if req.aprobar:
+            requirement.confirm()
+        else:
+            requirement.reject(note=req.nota)
 
-    if pedido["estado"] != OrderEstado.PENDIENTE_APROBACION:
+    try:
+        final = await team.acontinue_run(
+            run_response=run,
+            session_id=req.session_id,
+            stream=False,
+        )
+    except Exception as exc:
+        logger.exception("Fallo al reanudar run %s: %s", run_id, exc)
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"El pedido está en estado '{pedido['estado']}' y no puede ser aprobado.",
-        )
+            status_code=502,
+            detail="No se pudo reanudar el pedido. Reintentá en breve.",
+        ) from exc
 
-    if not body.aprobado:
-        await execute(
-            "UPDATE pedidos SET estado = $1, updated_at = NOW() WHERE id = $2",
-            OrderEstado.CANCELADO,
-            pedido_id,
-        )
-        await registrar(
-            "pedido_cancelado_por_cliente",
-            pedido_id=pedido_id,
-            session_id=pedido["session_id"],
-            payload={"operador_id": body.operador_id, "notas": body.notas},
-        )
-        return AprobacionResponse(
-            ok=True,
-            pedido_id=str(pedido_id),
-            mensaje="Pedido cancelado. ¿Podemos ayudarte con algo más?",
-        )
-
-    resultado = await ejecutar_fase_2(
-        pedido_id=str(pedido_id),
-        idempotency_key=pedido["idempotency_key"],
-        session_id=pedido["session_id"],
-    )
-
-    if not resultado.get("ok"):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=resultado.get("mensaje", "Error al procesar el pedido."),
-        )
-
-    return AprobacionResponse(
-        ok=True,
-        pedido_id=str(pedido_id),
-        mensaje=resultado.get("mensaje", "Pedido confirmado."),
-        url_pago=resultado.get("url_pago"),
-        total=resultado.get("total"),
-    )
+    content = getattr(final, "content", None)
+    payload = content.model_dump() if hasattr(content, "model_dump") else str(content)
+    return {
+        "run_id": run_id,
+        "session_id": req.session_id,
+        "aprobado": req.aprobar,
+        "resultado": payload,
+    }
