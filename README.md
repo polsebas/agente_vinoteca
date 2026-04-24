@@ -14,6 +14,7 @@ Backend multi-agente para una vinoteca: recomendaciones tipo sommelier, consulta
 - [Cómo ejecutar la API](#cómo-ejecutar-la-api)
 - [Endpoints principales](#endpoints-principales)
 - [AgentOS, seguridad y exposición pública](#agentos-seguridad-y-exposición-pública)
+  - [Agent UI self-hosted](#agent-ui-self-hosted)
 - [Jobs y scripts](#jobs-y-scripts)
 - [Tests y calidad](#tests-y-calidad)
 - [Estructura del proyecto](#estructura-del-proyecto)
@@ -86,6 +87,12 @@ docker compose up -d
 
 Eso levanta Postgres (`vinoteca` / `vinoteca_dev` / `vinoteca_db` en el puerto **5432**) y Redis en **6379**, alineado con el ejemplo de `DATABASE_URL` y `REDIS_URL` en `.env.example`.
 
+En el **primer arranque del volumen** de Postgres, la imagen oficial ya crea la base `vinoteca_db` (no hace falta crearla a mano si solo usás ese compose). Si usás un Postgres propio o cambiaste el nombre de la base en `DATABASE_URL`, antes del primer `uvicorn` podés asegurar que exista:
+
+```bash
+python scripts/ensure_database.py
+```
+
 ### 3. Variables de entorno
 
 ```bash
@@ -101,12 +108,13 @@ Las más importantes están documentadas en [`vinoteca_ia/.env.example`](vinotec
 
 | Grupo | Variables |
 |-------|-----------|
-| LLM | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `LLM_PRIMARY`, `LLM_FALLBACK` |
+| LLM | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `LLM_PRIMARY`, `LLM_FALLBACK` (id `claude-*` → Anthropic; si no, OpenAI — podés usar solo OpenAI poniendo ambos ids tipo `gpt-4o-mini`) |
 | Datos | `DATABASE_URL`, `DATABASE_POOL_MIN`, `DATABASE_POOL_MAX`, `REDIS_URL` |
 | Seguridad API | `APPROVAL_API_TOKEN`, `ADMIN_API_TOKEN`, `CHAT_API_KEY` (opcional en dev) |
 | Rate limit | `RATE_LIMIT_CHAT_PER_MIN`, `RATE_LIMIT_APPROVAL_PER_MIN`, `RATE_LIMIT_ADMIN_PER_MIN` |
 | Pagos (dev) | `MERCADOPAGO_*`, `MERCADOPAGO_MOCK_ENABLED` |
-| AgentOS | `AGENTOS_TRACING`, `AGENTOS_TELEMETRY`, `AGENTOS_PUBLIC_PATHS`, `AGENTOS_AUTHORIZATION`, `JWT_VERIFICATION_KEY` |
+| Embeddings | `HF_EMBEDDING_MODEL`, `EMBEDDING_DEVICE`, `EMBEDDING_MAX_LENGTH`, `EMBEDDING_DIM` |
+| AgentOS | `AGENTOS_TRACING`, `AGENTOS_TELEMETRY`, `AGENTOS_PUBLIC_PATHS`, `AGENTOS_RELAX_LOOPBACK_GUARD`, `OS_SECURITY_KEY`, `AGENTOS_AUTHORIZATION`, `JWT_VERIFICATION_KEY` |
 
 **Nota:** `DATABASE_URL` es obligatoria para **levantar el pool** en el lifespan del servidor; el import de la app puede tolerar su ausencia en entornos de tooling (stub interno para `PostgresDb`), pero en runtime real tenés que configurarla.
 
@@ -119,6 +127,8 @@ Desde `vinoteca_ia/` con el venv activado:
 ```bash
 uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 ```
+
+Al importar la app se carga automáticamente el archivo `.env` del directorio de trabajo (vía `python-dotenv`), así que `DATABASE_URL` definida ahí queda disponible para el proceso.
 
 - Documentación interactiva: `http://localhost:8000/docs` (FastAPI + rutas que AgentOS agrega; las rutas sensibles de AgentOS quedan restringidas — ver sección siguiente).
 - Entrypoint legado: `playground.py` reexporta la misma `app` que `api.main` (compatibilidad con `uvicorn playground:app`).
@@ -142,14 +152,47 @@ El cuerpo y los eventos SSE están descritos en los docstrings de [`vinoteca_ia/
 
 AgentOS expone muchas rutas útiles en desarrollo (`/agents`, `/teams`, `/approvals`, migraciones de DB, etc.). En este proyecto, un middleware **`InternalPathsGuard`** (montado desde [`core/agent_os_factory.py`](vinoteca_ia/core/agent_os_factory.py)) hace lo siguiente:
 
-- Solo los paths listados en **`AGENTOS_PUBLIC_PATHS`** (por defecto **`/health`** y **`/chat`**) son accesibles desde cualquier IP.
+- Solo los paths listados en **`AGENTOS_PUBLIC_PATHS`** (por defecto **`/health`**, **`/chat`** y **`/webhook`**) son accesibles desde cualquier IP.
 - El resto de rutas (incluidas las de AgentOS) **solo responden si la conexión viene de loopback** (`127.0.0.1`, `::1`, `localhost`). Desde internet devuelven **404** genérico.
 
 Así podés exponer públicamente el balanceador solo hacia `/chat` (y `/health` para probes), y usar port-forward o túnel local para el dashboard de AgentOS.
 
+### UI en [os.agno.com](https://os.agno.com/)
+
+El plan **Free** de Agno incluye el control plane para AgentOS **local**; el modo **Live** (URL HTTPS pública) entra en el flujo **Pro** — ver [pricing](https://www.agno.com/pricing). Para no pagar, el camino documentado es **Local** + tu API en `localhost` o IP.
+
+**Alta del OS** ([Connect Your AgentOS](https://docs.agno.com/agent-os/connect-your-os)):
+
+| Entorno | Qué URL va |
+|--------|------------|
+| **Local** | `http://localhost:PUERTO` o `http://IP_DE_TU_MÁQUINA:PUERTO` |
+| **Live** | HTTPS público (Pro); no es el objetivo del plan free |
+
+Si ves **“Local environment must use localhost or an IP address”**, estás en **Local** pero pegaste algo que no es host local (p. ej. URL `https://…trycloudflare.com`). Volvé a **Local** y usá solo `http://127.0.0.1:8000` (o el puerto que uses).
+
+**Chrome y `https://os.agno.com` → `http://localhost`:** el control plane conecta **desde el navegador directo a tu runtime** ([Control plane](https://docs.agno.com/agent-os/control-plane)); Agno no hace de proxy. En **Chrome** a veces aparece *Permission was denied … loopback address space*: es una **restricción del navegador** entre un origen HTTPS público y loopback, no la API ni CORS. En muchos equipos **Firefox** (u otro motor) deja pasar el mismo flujo **Local** + localhost; si en otro proyecto “te anduvo local”, suele ser por **navegador o versión de Chrome** distinta. No hay nada que este repo pueda cambiar para forzar a Chrome.
+
+**Vinoteca:** con tráfico realmente loopback, **`AGENTOS_RELAX_LOOPBACK_GUARD`** no hace falta para las rutas de AgentOS (el `InternalPathsGuard` ya deja pasar loopback). Dejalo en `false` salvo que uses túnel o IP no local.
+
+En versiones anteriores del factory se pasaba `cors_allowed_origins=["*"]` a AgentOS; Agno **saca** el `*` al armar `CORSMiddleware` y el `allow_origins` quedaba **vacío**. Eso ya está corregido delegando en los defaults de Agno (incluyen `https://os.agno.com`).
+
 Cuando quieras RBAC nativo de AgentOS: `AGENTOS_AUTHORIZATION=true` + `JWT_VERIFICATION_KEY` (ver [documentación de Agno](https://docs.agno.com/reference/agent-os/agent-os)); si activás autorización sin clave, la app falla al arrancar a propósito.
 
 **Telemetría:** `AGENTOS_TELEMETRY` por defecto es `false` (opt-in hacia los servicios de Agno).
+
+### Agent UI self-hosted
+
+Si el control plane en [os.agno.com](https://os.agno.com/) te choca con el navegador (p. ej. HTTPS público → loopback), podés usar la **Agent UI** open source: corre en **tu** máquina (`http://localhost:3000`) y el browser llama a tu AgentOS en `localhost` **mismo origen “local”** (origen `http://localhost:3000` → API `http://localhost:8000`), sin pasar por un sitio HTTPS de terceros. Documentación: [AgentUI](https://docs.agno.com/other/agent-ui).
+
+1. Levantá la API desde `vinoteca_ia/`: `uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload` (o el puerto que uses).
+2. En una carpeta aparte (por ejemplo al lado del repo), creá la UI:
+   ```bash
+   npx create-agent-ui@latest
+   ```
+   Confirmá el proyecto, luego `cd agent-ui && npm run dev` (o seguí la doc para `pnpm` si clonás [agno-agi/agent-ui](https://github.com/agno-agi/agent-ui)).
+3. Abrí `http://localhost:3000` y en el lateral poné el endpoint del OS, p. ej. **`http://127.0.0.1:8000`**. La doc muestra `localhost:7777` porque el ejemplo usa `agent_os.serve()` con el default de Agno; en este proyecto lo habitual es **8000** con `uvicorn`.
+4. Con UI y API en la misma máquina, el tráfico al puerto de la API suele verse como **loopback** → **`AGENTOS_RELAX_LOOPBACK_GUARD`** no hace falta para el `InternalPathsGuard`.
+5. Los defaults de CORS de Agno incluyen `http://localhost:3000` para esta UI.
 
 ---
 
@@ -158,9 +201,26 @@ Cuando quieras RBAC nativo de AgentOS: `AGENTOS_AUTHORIZATION=true` + `JWT_VERIF
 | Componente | Uso |
 |------------|-----|
 | [`jobs/nightly_audit.py`](vinoteca_ia/jobs/nightly_audit.py) | Auditoría programada (ej. cron): `python -m jobs.nightly_audit` desde `vinoteca_ia/`. |
-| [`scripts/seed_catalog.py`](vinoteca_ia/scripts/seed_catalog.py) | Sembrar catálogo. |
-| [`scripts/enrich_catalog.py`](vinoteca_ia/scripts/enrich_catalog.py) | Enriquecer catálogo. |
+| [`scripts/ensure_database.py`](vinoteca_ia/scripts/ensure_database.py) | Crea la base del `DATABASE_URL` en el cluster si no existe (Postgres ya tiene que estar arriba). |
+| [`scripts/ingest_product_details.py`](vinoteca_ia/scripts/ingest_product_details.py) | Ingesta masiva del catálogo desde `product_details.txt` (NDJSON). Upsert idempotente por `imagen` y fragmento `wine_knowledge` capa 1 listo para embeddings. |
+| [`scripts/seed_catalog.py`](vinoteca_ia/scripts/seed_catalog.py) | Sembrar catálogo (dataset chico legacy). |
+| [`scripts/enrich_catalog.py`](vinoteca_ia/scripts/enrich_catalog.py) | Generar embeddings locales (BETO en Hugging Face) para los fragmentos de `wine_knowledge` sin embedding. Corrida típica post-ingesta. |
 | [`scripts/migrate_mongo.py`](vinoteca_ia/scripts/migrate_mongo.py) | Migración desde Mongo (si aplica). |
+
+Orden recomendado para cargar el catálogo desde cero:
+
+```bash
+cd vinoteca_ia
+python scripts/ingest_product_details.py --dry-run           # valida y muestra reporte
+python scripts/ingest_product_details.py                      # persiste en Postgres
+python scripts/enrich_catalog.py                              # completa embeddings con BETO (primer run descarga el modelo)
+```
+
+Notas:
+
+- La tool [`buscar_por_ocasion`](vinoteca_ia/tools/catalog/search_by_occasion.py) joinea contra `vinos_ocasiones_embeddings`. Esa tabla aún no se genera en la ingesta base: la tool devolverá cero resultados hasta que se construya un job dedicado (fuera del alcance de este loader).
+- Las filas sin `precio de lista` se omiten con un contador en el reporte. Las tools de precio asumen valores reales y fallarían contra filas con `NULL` o cero.
+- Si migrás desde embeddings viejos (OpenAI 1536), el arranque aplica migración a `vector(768)` y deja `embedding = NULL`; corré `python scripts/enrich_catalog.py` para reindexar con BETO.
 
 ---
 

@@ -100,7 +100,8 @@ def test_app_combines_domain_and_agent_os_routes(patched_agents):
     )
 
 
-def test_agent_os_routes_blocked_from_external_ip(patched_agents):
+def test_agent_os_routes_blocked_from_external_ip(patched_agents, monkeypatch):
+    monkeypatch.delenv("AGENTOS_RELAX_LOOPBACK_GUARD", raising=False)
     from api.main import create_base_app
     from core.agent_os_factory import build_agent_os
 

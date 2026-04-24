@@ -20,6 +20,9 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "structlog>=24.4.0",
     "anyio>=4.4.0",
+    "torch>=2.4.0",
+    "transformers>=4.44.0",
+    "sentencepiece>=0.2.0",
 ]
 
 [project.optional-dependencies]

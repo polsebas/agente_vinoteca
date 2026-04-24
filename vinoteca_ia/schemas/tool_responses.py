@@ -32,6 +32,18 @@ class StockResponse(BaseModel):
     mensaje: str | None = None
 
 
+class RAGResult(BaseModel):
+    """Un fragmento de `wine_knowledge` devuelto por búsqueda semántica."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    vino_id: UUID
+    nombre_vino: str
+    capa: int
+    contenido: str
+    score: float
+
+
 class PrecioItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

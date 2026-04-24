@@ -1,103 +1,92 @@
 """
-Test de integración: flujo completo del Sumiller.
-Verifica que RAG → verificación stock → respuesta funciona end-to-end.
-Requiere variables de entorno de DB y LLM configuradas.
+Tests de integración: orquestador → sommelier y reglas de stock en SQL tools.
+
+Evitan LLM real mockeando `arun` del agente y `_clasificar` del orquestador.
 """
 
 from __future__ import annotations
 
+import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import uuid4
 
 import pytest
 
+from core.orchestrator import Orchestrator
+from schemas.agent_io import (
+    AgenteDestino,
+    IntentClass,
+    RouterOutput,
+    SessionRequest,
+)
 from schemas.session_state import SessionState
-from schemas.tool_responses import RAGResult, StockQueryResult
-from schemas.wine_catalog import StockInfo
+from schemas.tool_responses import ResultadoTool, StockResponse
 
 
 @pytest.mark.asyncio
-async def test_flujo_sumiller_recomendacion_con_stock():
-    """
-    El sumiller recibe una consulta de maridaje, busca en RAG,
-    verifica stock y genera una respuesta.
-    """
-    vino_id = uuid4()
-    session_id = f"sess_test_{uuid4().hex[:6]}"
-    correlation_id = f"sess_test_{uuid4().hex[:6]}"
-
-    [
-        RAGResult(
-            vino_id=vino_id,
-            nombre_vino="Zuccardi Valle de Uco",
-            capa=5,
-            contenido="Para un asado de cordero, este Malbec tiene la estructura perfecta.",
-            score=0.92,
+async def test_orquestador_deriva_a_sommelier_y_propaga_respuesta():
+    """El router marca maridaje; el orquestador llama al sommelier y devuelve su salida."""
+    # Sin `Orchestrator.__init__`: evita construir Agentes Agno (versión / kwargs del entorno).
+    orch = object.__new__(Orchestrator)
+    mock_arun = AsyncMock(
+        return_value=MagicMock(
+            content="Para el asado te recomiendo un Malbec de Valle de Uco; tenemos stock."
         )
-    ]
+    )
+    sommelier = MagicMock()
+    sommelier.arun = mock_arun
+    orch._agentes = {
+        "agente_inventario": MagicMock(),
+        "agente_sommelier": sommelier,
+        "agente_orders": MagicMock(),
+        "agente_support": MagicMock(),
+    }
 
-    StockQueryResult(
-        items=[
-            StockInfo(
-                vino_id=vino_id,
-                nombre="Zuccardi Valle de Uco",
-                disponible=True,
-                cantidad=36,
-            )
-        ],
-        todos_disponibles=True,
+    router_out = RouterOutput(
+        intencion=IntentClass.MARIDAJE,
+        confianza=0.92,
+        agente_destino=AgenteDestino.SOMMELIER,
+        razonamiento="test: consulta de maridaje",
     )
 
-    with (
-        patch("core.rag.retriever.generar_embedding", new_callable=AsyncMock) as mock_embed,
-        patch("core.rag.retriever.fetch_all", new_callable=AsyncMock) as mock_rag,
-        patch("storage.postgres.fetch_all", new_callable=AsyncMock) as mock_stock,
-    ):
-        mock_embed.return_value = [0.1] * 1536
-        mock_rag.return_value = [
-            MagicMock(**{
-                "__getitem__.side_effect": lambda k: {
-                    "vino_id": vino_id,
-                    "nombre_vino": "Zuccardi Valle de Uco",
-                    "capa": 5,
-                    "contenido": "Para un asado de cordero, ideal.",
-                    "score": 0.92,
-                }[k]
-            })
-        ]
-        mock_stock.return_value = []
-
-        state = SessionState(session_id=session_id, correlation_id=correlation_id)
-
-        assert state.session_id == session_id
-        assert state.historial == []
-
-        state_con_turno = state.agregar_turno(
-            "user", "¿Qué vino me recomendás para un asado de cordero?"
+    with patch.object(orch, "_clasificar", new_callable=AsyncMock, return_value=router_out):
+        req = SessionRequest(
+            session_id="sess_int_1",
+            correlation_id="corr_int_1",
+            mensaje="¿Qué vino me recomendás para un asado de cordero?",
         )
-        assert len(state_con_turno.historial) == 1
-        assert state_con_turno.historial[0].rol == "user"
+        state = SessionState(session_id=req.session_id, correlation_id=req.correlation_id)
+        state = state.con_turno("user", req.mensaje)
+
+        resp = await orch.procesar(req, state)
+
+    assert resp.agente == "agente_sommelier"
+    assert resp.intencion == IntentClass.MARIDAJE
+    assert resp.finalizado is True
+    assert "Malbec" in resp.respuesta or "asado" in resp.respuesta.lower()
+    mock_arun.assert_awaited_once()
 
 
 @pytest.mark.asyncio
-async def test_flujo_sumiller_sin_stock_no_recomienda():
-    """
-    Si todos los candidatos tienen stock 0, el sumiller no debe recomendar ninguno.
-    """
-    vino_id = uuid4()
-    f"sess_test_{uuid4().hex[:6]}"
+async def test_consultar_stock_cero_no_disponible():
+    """La tool SQL marca `disponible=False` cuando la fila tiene cantidad 0."""
+    vino_id = uuid.uuid4()
+    mock_row = MagicMock()
+    mock_row.__getitem__ = lambda self, k: {
+        "id": vino_id,
+        "nombre": "Vino Agotado",
+        "cantidad": 0,
+        "ubicacion": "deposito_principal",
+    }[k]
 
-    stock_sin_disponibilidad = StockQueryResult(
-        items=[
-            StockInfo(
-                vino_id=vino_id,
-                nombre="Vino Agotado",
-                disponible=False,
-                cantidad=0,
-            )
-        ],
-        todos_disponibles=False,
-    )
+    with patch("tools.catalog.consult_stock.fetch_all", new_callable=AsyncMock) as mock_fetch:
+        mock_fetch.return_value = [mock_row]
+        from tools.catalog.consult_stock import consultar_stock
 
-    assert not stock_sin_disponibilidad.todos_disponibles
-    assert stock_sin_disponibilidad.items[0].cantidad == 0
+        result = await consultar_stock.entrypoint(vino_ids=[str(vino_id)])
+
+    assert isinstance(result, StockResponse)
+    assert result.resultado == ResultadoTool.OK
+    assert result.todos_disponibles is False
+    assert len(result.items) == 1
+    assert result.items[0].disponible is False
+    assert result.items[0].cantidad == 0

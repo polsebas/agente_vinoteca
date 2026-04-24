@@ -23,6 +23,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from core.agent_os_factory import (
     InternalPathsGuard,
+    _env_bool,
     _public_paths,
     add_internal_paths_guard,
 )
@@ -31,6 +32,8 @@ from core.agent_os_factory import (
 def _build_app(
     public_paths: tuple[str, ...] = ("/health", "/chat"),
     force_client_host: str | None = None,
+    *,
+    relax_loopback_guard: bool = False,
 ) -> FastAPI:
     app = FastAPI()
 
@@ -54,7 +57,11 @@ def _build_app(
     def approvals_resolve(approval_id: str):
         return {"approval_id": approval_id}
 
-    app.add_middleware(InternalPathsGuard, public_paths=public_paths)
+    app.add_middleware(
+        InternalPathsGuard,
+        public_paths=public_paths,
+        relax_loopback_guard=relax_loopback_guard,
+    )
 
     if force_client_host is not None:
 
@@ -94,12 +101,23 @@ def test_internal_approvals_route_blocked_from_external_ip():
     assert resp.status_code == 404
 
 
+def test_relax_loopback_guard_allows_internal_from_external_ip():
+    app = _build_app(force_client_host="8.8.8.8", relax_loopback_guard=True)
+    client = TestClient(app)
+    assert client.post("/agents/x/runs").status_code == 200
+
+
 @pytest.mark.parametrize("loopback", ["127.0.0.1", "::1", "localhost"])
 def test_loopback_passes_to_internal_routes(loopback: str):
     app = _build_app(force_client_host=loopback)
     client = TestClient(app)
     resp = client.post("/agents/x/runs")
     assert resp.status_code == 200
+
+
+def test_env_bool_strips_wrapping_quotes(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("AGENTOS_RELAX_LOOPBACK_GUARD", '"true"')
+    assert _env_bool("AGENTOS_RELAX_LOOPBACK_GUARD") is True
 
 
 def test_public_paths_env_override(monkeypatch: pytest.MonkeyPatch):
@@ -109,19 +127,20 @@ def test_public_paths_env_override(monkeypatch: pytest.MonkeyPatch):
 
 def test_public_paths_env_default_when_unset(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.delenv("AGENTOS_PUBLIC_PATHS", raising=False)
-    assert _public_paths() == ("/health", "/chat")
+    assert _public_paths() == ("/health", "/chat", "/webhook")
 
 
 def test_public_paths_env_empty_falls_back_to_default(
     monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.setenv("AGENTOS_PUBLIC_PATHS", "   ,  ")
-    assert _public_paths() == ("/health", "/chat")
+    assert _public_paths() == ("/health", "/chat", "/webhook")
 
 
 def test_add_internal_paths_guard_uses_env_when_no_arg(
     monkeypatch: pytest.MonkeyPatch,
 ):
+    monkeypatch.delenv("AGENTOS_RELAX_LOOPBACK_GUARD", raising=False)
     monkeypatch.setenv("AGENTOS_PUBLIC_PATHS", "/only-this")
     app = FastAPI()
 

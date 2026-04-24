@@ -2,8 +2,8 @@
 
 Este agente emite un `RouterOutput` estructurado. En la topología real del
 sistema, el **ruteo efectivo** lo hace el Team (ver `router_team.py`) con
-`mode="route"`, que delega al especialista y devuelve su respuesta
-directamente al cliente, cumpliendo el patrón `transfer_task` de Agno.
+`mode="route"` y el prompt `router_team_leader_v1.md`, que delega vía
+`delegate_task_to_member` sin exponer JSON al cliente.
 
 Este archivo expone además un agente router "puro" (solo clasifica, sin
 delegar) para debug, auditoría y pipelines offline que no levantan el Team.

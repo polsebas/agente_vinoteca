@@ -16,8 +16,10 @@ from __future__ import annotations
 
 import logging
 import os
+import warnings
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 
 from api.routes.approve import router as approve_router
@@ -28,6 +30,16 @@ from api.routes.webhook import router as webhook_router
 from core.agent_os_factory import build_agent_os
 from storage.migrations import ensure_all_migrations
 from storage.postgres import close_pool, get_agno_db, get_pool
+
+load_dotenv()
+
+# Agno 2.5.x: `GET /config` y `GET .../configs/{version}` comparten operation_id
+# "get_config" (router base vs components). OpenAPI duplica el id; el aviso es ruido.
+warnings.filterwarnings(
+    "ignore",
+    message=r"^Duplicate Operation ID get_config for function get_config_version\b",
+    category=UserWarning,
+)
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO"),

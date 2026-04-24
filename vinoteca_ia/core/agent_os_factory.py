@@ -56,7 +56,10 @@ def _env_bool(name: str, default: bool = False) -> bool:
     raw = os.environ.get(name)
     if raw is None:
         return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
+    s = raw.strip()
+    if len(s) >= 2 and s[0] == s[-1] and s[0] in "'\"":
+        s = s[1:-1].strip()
+    return s.lower() in {"1", "true", "yes", "on"}
 
 
 def _public_paths() -> tuple[str, ...]:
@@ -77,6 +80,11 @@ class InternalPathsGuard(BaseHTTPMiddleware):
     o port-forward). Lo único público son los paths declarados
     explícitamente (por default `/health` y `/chat`).
 
+    Para enlazar la UI hospedada en os.agno.com contra una API en URL
+    pública o LAN, el navegador no aparece como loopback: usá
+    `AGENTOS_RELAX_LOOPBACK_GUARD=true` solo en dev y preferiblemente con
+    `OS_SECURITY_KEY` (Bearer) para que AgentOS no quede abierto.
+
     Responde 404 al bloquear para no filtrar la existencia del endpoint.
     """
 
@@ -84,11 +92,14 @@ class InternalPathsGuard(BaseHTTPMiddleware):
         self,
         app: ASGIApp,
         public_paths: tuple[str, ...],
+        *,
         loopback_hosts: frozenset[str] = _LOOPBACK_HOSTS,
+        relax_loopback_guard: bool = False,
     ) -> None:
         super().__init__(app)
         self._public = tuple(public_paths)
         self._loopback = loopback_hosts
+        self._relax_loopback_guard = relax_loopback_guard
 
     def _is_public(self, path: str) -> bool:
         for prefix in self._public:
@@ -104,7 +115,11 @@ class InternalPathsGuard(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
-        if self._is_public(path) or self._is_loopback(request):
+        if (
+            self._is_public(path)
+            or self._is_loopback(request)
+            or self._relax_loopback_guard
+        ):
             return await call_next(request)
         return JSONResponse(status_code=404, content={"detail": "Not Found"})
 
@@ -112,11 +127,16 @@ class InternalPathsGuard(BaseHTTPMiddleware):
 def add_internal_paths_guard(
     app: FastAPI,
     public_paths: tuple[str, ...] | None = None,
+    *,
+    relax_loopback_guard: bool | None = None,
 ) -> None:
     """Monta `InternalPathsGuard` en el FastAPI recibido."""
+    if relax_loopback_guard is None:
+        relax_loopback_guard = _env_bool("AGENTOS_RELAX_LOOPBACK_GUARD", default=False)
     app.add_middleware(
         InternalPathsGuard,
         public_paths=public_paths or _public_paths(),
+        relax_loopback_guard=relax_loopback_guard,
     )
 
 
@@ -171,7 +191,10 @@ def build_agent_os(*, base_app: FastAPI) -> AgentOS:
         agents=[factory() for factory in AGENT_FACTORIES],
         teams=[factory() for factory in TEAM_FACTORIES],
         base_app=base_app,
-        cors_allowed_origins=["*"],
+        # No uses ["*"]: Agno hace merge en update_cors_middleware y elimina "*",
+        # quedando allow_origins vacío → el browser en os.agno.com falla por CORS.
+        # None delega en AgnoAPISettings (incluye https://os.agno.com, etc.).
+        cors_allowed_origins=None,
         on_route_conflict="preserve_base_app",
         tracing=_env_bool("AGENTOS_TRACING", default=False),
         telemetry=_env_bool("AGENTOS_TELEMETRY", default=False),

@@ -8,21 +8,20 @@ from __future__ import annotations
 import os
 
 from agno.agent import Agent
-from agno.models.anthropic import Claude
 
+from core.model_provider import get_resilient_model
 from tools.catalog.consult_price import consultar_precio
 from tools.catalog.consult_stock import consultar_stock
 
 
 def crear_agente_inventario() -> Agent:
     constitution = _cargar_constitucion()
+    primary, fallbacks = get_resilient_model(temperature=0.0)
 
     return Agent(
         name="agente_inventario",
-        model=Claude(
-            id=os.environ.get("LLM_PRIMARY", "claude-3-5-sonnet-20241022"),
-            temperature=0.0,
-        ),
+        model=primary,
+        fallback_models=fallbacks,
         instructions=constitution,
         tools=[consultar_stock, consultar_precio],
         show_tool_calls=True,

@@ -21,7 +21,10 @@ from agents.support_agent import crear_agente_support
 from core.model_provider import get_resilient_model
 from storage.postgres import get_agno_db
 
-_PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "router_v1.md"
+# No usar `router_v1.md` acá: ese contrato pide JSON RouterOutput y el stream
+# del `/chat` lo exponía al cliente. El líder en modo route debe delegar con
+# `delegate_task_to_member` (ver prompts/router_team_leader_v1.md).
+_PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "router_team_leader_v1.md"
 
 
 def _load_constitution() -> str:
@@ -33,6 +36,9 @@ def crear_router_team() -> Team:
 
     El leader opera a temperatura 0.0 y tiene un `tool_call_limit=1`: clasifica
     y transfiere, no itera. La respuesta del miembro sale directo al cliente.
+
+    Los member_id que espera delegate_task_to_member son URL-safe (kebab-case),
+    p. ej. 'agente-sommelier' (ver agno.utils.team.get_member_id).
     """
     primary, fallbacks = get_resilient_model(temperature=0.0)
     return Team(
