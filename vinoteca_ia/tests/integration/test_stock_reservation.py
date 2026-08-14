@@ -1,19 +1,13 @@
-"""Concurrencia de reserva de stock.
+"""Concurrencia de creación de orden (Fase 2 2PC).
 
-Este test requiere una Postgres accesible (variable `TEST_DATABASE_URL` o,
-en su defecto, `DATABASE_URL`). Si ninguna está seteada, se saltea.
-
-Escenario: dos sesiones intentan reservar la última unidad de un vino al
-mismo tiempo. La segunda reserva debe fallar (`todos_disponibles=False`).
-Después, la creación de orden desde una sesión sin reservas debe rechazarse.
+`verificar_stock_exacto` es de solo lectura; la exclusión mutua ocurre en
+`crear_orden` con `FOR UPDATE` + UPDATE condicional.
 """
 
 from __future__ import annotations
 
-import asyncio
 import os
 from decimal import Decimal
-from uuid import uuid4
 
 import pytest
 
@@ -34,72 +28,83 @@ def db_url():
 
 @pytest.fixture
 async def seeded_wine(db_url, monkeypatch):
-    """Crea un vino con stock=1 y limpia al terminar."""
     monkeypatch.setenv("DATABASE_URL", db_url)
-
     from storage.migrations import ensure_all_migrations
     from storage.postgres import close_pool, get_pool
 
+    try:
+        await ensure_all_migrations()
+    except OSError as exc:
+        pytest.skip(f"Postgres no disponible: {exc}")
     pool = await get_pool()
+    vid = "test-wine-stock-1"
+    precio = Decimal("1000.00")
     async with pool.acquire() as conn:
-        await conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS vinos (
-                id UUID PRIMARY KEY,
-                nombre TEXT NOT NULL,
-                precio_ars NUMERIC(12,2) NOT NULL DEFAULT 1000,
-                activo BOOLEAN NOT NULL DEFAULT TRUE
+        cols = {
+            row["column_name"]
+            for row in await conn.fetch(
+                """
+                SELECT column_name FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'vinos'
+                """
             )
-            """
-        )
-        await conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS stock (
-                vino_id UUID PRIMARY KEY REFERENCES vinos(id),
-                cantidad INT NOT NULL,
-                ubicacion TEXT NOT NULL DEFAULT 'deposito_principal'
+        }
+        if "precio_ars" in cols:
+            await conn.execute(
+                """
+                INSERT INTO vinos (id, nombre, bodega, precio, precio_ars, anada, activo)
+                VALUES ($1, $2, $3, $4, $4, 2020, TRUE)
+                ON CONFLICT (id) DO UPDATE
+                SET precio = EXCLUDED.precio, precio_ars = EXCLUDED.precio_ars, activo = TRUE
+                """,
+                vid,
+                "Test Wine",
+                "Test",
+                precio,
             )
+        else:
+            await conn.execute(
+                """
+                INSERT INTO vinos (id, nombre, bodega, precio, anada, activo)
+                VALUES ($1, $2, $3, $4, 2020, TRUE)
+                ON CONFLICT (id) DO UPDATE SET precio = EXCLUDED.precio, activo = TRUE
+                """,
+                vid,
+                "Test Wine",
+                "Test",
+                precio,
+            )
+        await conn.execute("DELETE FROM pedido_lineas WHERE producto_id = $1", vid)
+        await conn.execute(
+            "DELETE FROM pedidos WHERE id LIKE 'PED-%' AND session_id LIKE 'sess-conc-%'"
+        )
+        await conn.execute("DELETE FROM stock WHERE producto_id = $1", vid)
+        await conn.execute(
             """
-        )
-    await ensure_all_migrations()
-
-    vid = uuid4()
-    async with pool.acquire() as conn:
-        await conn.execute(
-            "INSERT INTO vinos (id, nombre, precio_ars) VALUES ($1, $2, $3)",
-            vid,
-            "Test Wine",
-            Decimal("1000.00"),
-        )
-        await conn.execute(
-            "INSERT INTO stock (vino_id, cantidad) VALUES ($1, 1)",
+            INSERT INTO stock (producto_id, cantidad_disponible, reservado)
+            VALUES ($1, 1, 0)
+            """,
             vid,
         )
-
     yield vid
-
     async with pool.acquire() as conn:
-        await conn.execute("DELETE FROM stock_reservas WHERE vino_id = $1", vid)
-        await conn.execute("DELETE FROM stock WHERE vino_id = $1", vid)
+        await conn.execute("DELETE FROM pedido_lineas WHERE producto_id = $1", vid)
+        await conn.execute("DELETE FROM stock WHERE producto_id = $1", vid)
         await conn.execute("DELETE FROM vinos WHERE id = $1", vid)
     await close_pool()
 
 
-async def test_concurrent_reservas_solo_una_exitosa(seeded_wine):
-    """Dos sesiones pidiendo 1 unidad sobre stock=1: solo una obtiene reserva."""
+async def test_verify_stock_es_solo_lectura(seeded_wine):
     from tools.orders.verify_stock_exact import verificar_stock_exacto
 
     vid = seeded_wine
-    lineas = [{"vino_id": str(vid), "cantidad": 1}]
-
-    resp_a, resp_b = await asyncio.gather(
-        verificar_stock_exacto.entrypoint(session_id="sess-A", lineas=lineas),
-        verificar_stock_exacto.entrypoint(session_id="sess-B", lineas=lineas),
+    a = await verificar_stock_exacto.entrypoint(
+        session_id="sess-A",
+        lineas=[{"producto_id": vid, "cantidad": 1}],
     )
-
-    exitosas = [r for r in (resp_a, resp_b) if r.todos_disponibles]
-    assert len(exitosas) == 1, (
-        f"Se esperaba exactamente una reserva exitosa, "
-        f"pero se obtuvieron: A={resp_a.todos_disponibles}, B={resp_b.todos_disponibles}"
+    b = await verificar_stock_exacto.entrypoint(
+        session_id="sess-B",
+        lineas=[{"producto_id": vid, "cantidad": 1}],
     )
-    assert exitosas[0].reserva_token in {"sess-A", "sess-B"}
+    assert a.todos_disponibles is True
+    assert b.todos_disponibles is True

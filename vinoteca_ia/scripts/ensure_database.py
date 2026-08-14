@@ -72,9 +72,7 @@ def main() -> None:
             if cur.fetchone():
                 print(f"La base «{target_db}» ya existe. Nada que hacer.")
                 return
-            cur.execute(
-                sql.SQL("CREATE DATABASE {}").format(sql.Identifier(target_db))
-            )
+            cur.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(target_db)))
         print(f"Base «{target_db}» creada. Ya podés levantar la API (uvicorn).")
     finally:
         conn.close()

@@ -1,60 +1,51 @@
-"""Agente de Pedidos: Two-Phase Commit con human-in-the-loop.
-
-El patrón de pausa-reanudación se implementa con:
-- `requires_confirmation=True` en las tools `crear_orden` y `enviar_link_pago`
-  (definido en las propias tools).
-- `acontinue_run()` del agente, invocado desde el endpoint `/aprobar` con
-  las ToolExecutions marcadas como aprobadas.
-
-El prompt (`orders_v1.md`) garantiza el orden correcto: stock → cálculo →
-resumen → pausa → crear → link.
-"""
+"""Agente de Pedidos: Two-Phase Commit con human-in-the-loop (T=0.0)."""
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from agno.agent import Agent
+from agno.models.base import Model
 
-from core.model_provider import get_resilient_model
+from agents.constitution import make_agent
+from core.idempotency import IdempotencyManager
 from schemas.agent_io import OrderResponse
 from storage.postgres import get_agno_db
 from tools.orders.calculate_order import calcular_orden
+from tools.orders.check_order_status import consultar_estado_pedido
 from tools.orders.create_order import crear_orden
 from tools.orders.send_payment_link import enviar_link_pago
 from tools.orders.verify_stock_exact import verificar_stock_exacto
 
-_PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "orders_v1.md"
+ORDERS_TEMPERATURE = 0.0
+ORDERS_TOOLS = [
+    verificar_stock_exacto,
+    calcular_orden,
+    crear_orden,
+    enviar_link_pago,
+    consultar_estado_pedido,
+]
 
 
-def _load_constitution() -> str:
-    return _PROMPT_PATH.read_text(encoding="utf-8")
+def generar_idempotency_key(session_id: str) -> str:
+    """Clave de un solo uso por sesión para operaciones de pedido."""
+    digest = IdempotencyManager.build_key("orden", session_id)
+    return f"ord_{session_id}_{digest.split(':', 1)[-1][:12]}"
 
 
-def crear_agente_orders() -> Agent:
-    """Construye una instancia nueva del Orders agent.
-
-    Las tools `crear_orden` y `enviar_link_pago` ya vienen con
-    `requires_confirmation=True`: el framework Agno pausa el run antes de
-    ejecutarlas y emite un evento de pausa. El endpoint `/pedido/{id}/aprobar`
-    se encarga de reanudar con `acontinue_run()` pasando la aprobación.
-    """
-    primary, fallbacks = get_resilient_model(temperature=0.0)
-    return Agent(
+def get_orders_agent(model: Model | None = None) -> Agent:
+    """Factory Agno 2.5: Orders 2PC. `crear_orden`/`enviar_link_pago` piden HitL."""
+    return make_agent(
         name="agente_orders",
-        model=primary,
-        fallback_models=fallbacks,
-        instructions=_load_constitution(),
-        tools=[
-            verificar_stock_exacto,
-            calcular_orden,
-            crear_orden,
-            enviar_link_pago,
-        ],
+        description="Ejecuta el Two-Phase Commit de pedidos y el link de pago.",
+        prompt_file="orders_v1.md",
+        temperature=ORDERS_TEMPERATURE,
+        model=model,
+        tools=ORDERS_TOOLS,
         output_schema=OrderResponse,
         tool_call_limit=5,
         db=get_agno_db(),
         add_history_to_context=True,
         num_history_runs=3,
-        markdown=False,
     )
+
+
+crear_agente_orders = get_orders_agent

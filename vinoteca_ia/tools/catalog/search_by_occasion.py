@@ -1,16 +1,14 @@
-"""Búsqueda semántica de vinos por ocasión (RAG)."""
+"""Búsqueda de vinos por ocasión vía MemGraphRAG (grafo IDEAL_PARA)."""
 
 from __future__ import annotations
 
 from agno.tools import tool
 
-from schemas.tool_responses import (
-    OccasionResponse,
-    ResultadoTool,
-    VinoRecomendado,
-)
-from schemas.wine_catalog import WineProduct
-from storage.postgres import fetch_all
+from core.rag.memgraph_adapter import query_memgraph_rag
+from core.rag.retriever import buscar_similar
+from schemas.customer_profile import PerfilClienteTipo
+from schemas.knowledge_fragment import CapaConocimiento
+from schemas.tool_responses import OccasionResponse, ResultadoTool
 
 
 @tool
@@ -18,23 +16,14 @@ async def buscar_por_ocasion(
     descripcion_ocasion: str,
     limite: int = 5,
 ) -> OccasionResponse:
-    """Buscar vinos apropiados para una ocasión o contexto de consumo.
+    """Buscar vinos para una ocasión (regalo, cena, asado) vía grafo MemGraphRAG.
 
-    Usá esta tool cuando:
-    - El cliente pide un vino "para regalar a un jefe".
-    - Necesita algo "para una cena romántica".
-    - Quiere "un vino para compartir con amigos el finde".
-
-    Esta tool NO reemplaza `buscar_por_maridaje`. Si el contexto menciona
-    comida, usá `buscar_por_maridaje`. Si menciona contexto social/emocional,
-    usá esta. SIEMPRE verificá stock y precio después con las tools dedicadas.
+    Usá esta tool cuando el contexto es social/emocional. Si menciona comida,
+    preferí `buscar_por_maridaje`. SIEMPRE verificá stock y precio en SQL.
 
     Args:
         descripcion_ocasion: Texto libre de la ocasión.
-        limite: Máximo de recomendaciones (1-10).
-
-    Returns:
-        OccasionResponse con vinos ordenados por relevancia semántica.
+        limite: Máximo de fragmentos (1-10).
     """
     limite = max(1, min(limite, 10))
     if not descripcion_ocasion.strip():
@@ -42,49 +31,24 @@ async def buscar_por_ocasion(
             resultado=ResultadoTool.ERROR,
             mensaje="La descripción de la ocasión no puede estar vacía.",
         )
-
-    rows = await fetch_all(
-        """
-        SELECT v.id, v.nombre, v.bodega, v.varietal, v.region,
-               v.precio_ars, v.anada_actual, v.descripcion,
-               1 - (ve.embedding <=> (
-                   SELECT embedding FROM embeddings_query
-                   WHERE texto = $1 LIMIT 1
-               )) AS score
-        FROM vinos v
-        JOIN vinos_ocasiones_embeddings ve ON ve.vino_id = v.id
-        WHERE v.activo = TRUE
-        ORDER BY score DESC
-        LIMIT $2
-        """,
-        descripcion_ocasion,
-        limite,
+    fragmentos = await query_memgraph_rag(
+        descripcion_ocasion.strip(),
+        perfil_cliente=PerfilClienteTipo.OCASION,
+        top_k=limite,
     )
-
-    if not rows:
+    if not fragmentos:
+        fragmentos = await buscar_similar(
+            descripcion_ocasion.strip(),
+            capas=[
+                CapaConocimiento.HISTORIA,
+                CapaConocimiento.TENDENCIA,
+                CapaConocimiento.VOZ_PROPIA,
+            ],
+            top_k=limite,
+        )
+    if not fragmentos:
         return OccasionResponse(
             resultado=ResultadoTool.NO_ENCONTRADO,
             mensaje="No se encontró ningún vino para esa ocasión.",
         )
-
-    recomendaciones = [
-        VinoRecomendado(
-            vino=WineProduct(
-                vino_id=row["id"],
-                nombre=row["nombre"],
-                bodega=row["bodega"],
-                varietal=row["varietal"],
-                region=row["region"],
-                precio_ars=row["precio_ars"],
-                anada_actual=row["anada_actual"],
-                descripcion=row["descripcion"],
-            ),
-            score_relevancia=float(row["score"] or 0.0),
-            razon=f"Relevante para: {descripcion_ocasion}",
-        )
-        for row in rows
-    ]
-    return OccasionResponse(
-        resultado=ResultadoTool.OK,
-        recomendaciones=recomendaciones,
-    )
+    return OccasionResponse(resultado=ResultadoTool.OK, fragmentos=fragmentos)

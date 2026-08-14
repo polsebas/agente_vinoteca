@@ -1,21 +1,30 @@
-# Skill: Arquitectura Cognitiva y Estrategia de Agentes
+# Skill: Arquitectura cognitiva — Vinoteca IA
 
-## 1. Ciclo de Ejecución (Bucle PRAO)
-* [cite_start]**Obligatorio**: Todo agente debe operar bajo el flujo Perceive → Reason → Act → Observe[cite: 29, 55, 218].
-* [cite_start]**Estado**: El código debe ser estrictamente stateless; el orquestador gestiona la persistencia del historial[cite: 30, 56, 112].
-* [cite_start]**Control de Pasos**: Implementar un límite duro de iteraciones (`max_steps`) para evitar bucles infinitos y consumo de tokens[cite: 172, 231].
+Fuente de verdad: `docs/architecture.md` y el código en `vinoteca_ia/`.
 
-## 2. Separación de Datos (Probabilístico vs. Determinista)
-* [cite_start]**Fuente de Verdad (SQL)**: Precios, stock y datos transaccionales se consultan ÚNICAMENTE vía SQL (mcp-postgres/sqlite)[cite: 15, 31, 249].
-* [cite_start]**Prohibición**: Queda terminantemente prohibido usar búsquedas vectoriales (RAG) para recuperar precios o disponibilidad para evitar alucinaciones[cite: 16, 61, 250].
-* [cite_start]**Uso de Vectores**: RAG Vectorial se reserva exclusivamente para conocimiento cualitativo: notas de cata, historia de bodegas y maridajes[cite: 17, 58, 252].
+## PRAO
 
-## 3. Seguridad y Human-in-the-Loop (HitL)
-* [cite_start]**Acciones Críticas**: Cobros, reembolsos o eliminación de registros requieren obligatoriamente el patrón de dos fases[cite: 22, 72, 285]:
-    1. [cite_start]**Fase Preparación**: Crear un registro "Pendiente de Aprobación" y pausar el bucle PRAO[cite: 23, 139, 298].
-    2. [cite_start]**Fase Ejecución**: Solo se procede tras una señal externa en el endpoint `/aprobar`[cite: 24, 73, 301].
-* [cite_start]**Idempotencia**: Inyectar `idempotency_keys` en cada paso lógico para prevenir cobros dobles por fallos de red[cite: 21, 56, 276].
+Todo turno de chat pasa por `VinotecaOrchestrator.process_turn`:
 
-## 4. Topología de Agentes
-* [cite_start]**Router**: Clasifica la intención y deriva al especialista mediante `transfer_task`[cite: 57, 114, 330].
-* [cite_start]**Especialistas**: El agente Sommelier (Cata), Pedidos (Transacción) e Inventario (Stock) tienen límites de herramientas estrictos[cite: 58, 59, 60].
+1. **Perceive** — guardrails (injection bloquea; PII se enmascara), perfil semántico, working memory (8 turnos).
+2. **Reason** — `RouterAgent` T=0.0. Confianza menor a 0.85 → no derivar.
+3. **Act** — especialista Agno; tope de pasos; stuck-state a 3 firmas de tool idénticas. Si el LLM cae: `core/llm_fallback.py` + las mismas tools.
+4. **Observe** — episódico, KPIs, costo, spans. Summarizer extractivo si hay ≥ 12 turnos.
+
+## SQL vs grafo
+
+- **PostgreSQL / asyncpg**: precio, stock, envío, pedidos, idempotencia de cobro, `log_inmutable`.
+- **MemGraphRAG**: capas 1–5 (dato duro, terruño, historia, tendencia, voz propia). PPR λ=0.5, 10 iteraciones. Nunca para cotizar.
+
+## 2PC
+
+1. **Preparación**: `verificar_stock_exacto` + `calcular_orden` (solo lectura). Resumen + "¿Confirmás?".
+2. **Ejecución**:
+   - Chat PRAO: el cliente dice **confirmo** → `crear_orden` (Redis idempotency, `FOR UPDATE`, SHA-256 en `log_inmutable`).
+   - Team/AgentOS: pause por `requires_confirmation=True` → `POST /pedido/{run_id}/aprobar`.
+
+## Topología
+
+Router → Sommelier | Inventory | Orders | Support | Events. Judge + Auditor son jobs (`jobs/nightly_audit.py`), no canal cliente.
+
+HitL de operador y `/admin/*` son fail-closed sin token de entorno.

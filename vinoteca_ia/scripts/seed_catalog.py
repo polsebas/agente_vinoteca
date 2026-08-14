@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 
 import asyncpg
 from dotenv import load_dotenv
@@ -19,7 +20,7 @@ VINOS: list[dict] = [
         "nombre": "Achaval Ferrer Malbec",
         "bodega": "Achaval Ferrer",
         "varietal": "Malbec",
-        "cosecha": 2021,
+        "cosecha": 2022,
         "precio": 4500.00,
         "descripcion": "Malbec de alta gama de Mendoza, terroir excepcional.",
         "region": "Mendoza",
@@ -28,11 +29,11 @@ VINOS: list[dict] = [
         "maridajes": ["asado", "cordero", "quesos duros"],
         "stock": 24,
         "conocimiento": {
-            1: "Malbec 100%, cosecha 2021. Alcohol 14,5%. Precio $4.500. Color rojo rubí profundo.",
+            1: "Malbec 100%, cosecha 2022. Alcohol 14,5%. Color rojo rubí profundo.",
             2: "Proviene de viñedos en Luján de Cuyo a 900 metros sobre el nivel del mar. Suelos pedregosos con alta carga mineral que le dan estructura y frescura al vino.",
             3: "Bodega fundada en 1998 por Roberto Cipresso y socios. Desde el inicio apostaron por la expresión del terroir sin maquillaje. El enólogo Santiago Achaval toma decisiones mínimamente intervencionistas.",
             4: "Los Malbec de Luján de Cuyo están siendo redescubiertos por la crítica internacional como la expresión más elegante del varietal. Menos potencia, más fineza que los de altitud.",
-            5: "Lo elegimos porque su relación calidad-precio es imbatible. Es el vino que recomendamos cuando alguien quiere quedar bien sin gastar una fortuna. El 2021 fue una cosecha espectacular en Mendoza.",
+            5: "Lo elegimos porque su relación calidad-precio es imbatible. Es el vino que recomendamos cuando alguien quiere quedar bien sin gastar una fortuna. El 2022 fue una cosecha espectacular en Mendoza.",
         },
     },
     {
@@ -73,6 +74,26 @@ VINOS: list[dict] = [
             3: "Familia Zuccardi lleva tres generaciones en Mendoza. José Alberto Zuccardi es referente mundial. Su hijo Sebastián es hoy el enólogo.",
             4: "Zuccardi es la bodega argentina del momento. Fue elegida como Mejor Bodega del Mundo por la World's Best Vineyards.",
             5: "El vino perfecto para el que está empezando a explorar el Malbec. Fresco, frutal, sin taninos agresivos. No falla nunca.",
+        },
+    },
+    {
+        "nombre": "Zuccardi Valle Tempranillo",
+        "bodega": "Zuccardi",
+        "varietal": "Tempranillo",
+        "cosecha": 2022,
+        "precio": 7800.00,
+        "descripcion": "Tempranillo de Valle de Uco, fresco y con tanino amable.",
+        "region": "Mendoza",
+        "sub_region": "Valle de Uco",
+        "alcohol": 13.6,
+        "maridajes": ["empanadas", "pizza", "quesos semiduros"],
+        "stock": 20,
+        "conocimiento": {
+            1: "Tempranillo 100%, Valle de Uco, cosecha 2022. Alcohol 13,6%.",
+            2: "Viñedos en Paraje Altamira sobre suelos calcáreos. La amplitud térmica conserva acidez y frescura.",
+            3: "Sebastián Zuccardi explora varietales españoles en altura para mostrar otro registro del Valle de Uco.",
+            4: "El Tempranillo argentino de altura está ganando espacio en cartas que buscan alternativas al Malbec.",
+            5: "Lo elegimos para quien quiere un tinto de asado accesible, distinto al Malbec clásico, sin perder fruta.",
         },
     },
     {
@@ -133,6 +154,26 @@ VINOS: list[dict] = [
             3: "Luigi Bosca es una de las bodegas más antiguas de Argentina, fundada en 1901. Cuarta generación de la familia Arizu.",
             4: "Los blancos de alta gama de Argentina están ganando reconocimiento internacional. El Viognier mendocino es aromáticamente superior a los europeos.",
             5: "Para el que pide un blanco de categoría y quiere algo diferente al Chardonnay clásico. El Viognier sorprende siempre.",
+        },
+    },
+    {
+        "nombre": "Luigi Bosca D.O.C.",
+        "bodega": "Luigi Bosca",
+        "varietal": "Malbec",
+        "cosecha": 2021,
+        "precio": 8900.00,
+        "descripcion": "Malbec D.O.C. Luján de Cuyo, el sello de origen de Luigi Bosca.",
+        "region": "Mendoza",
+        "sub_region": "Luján de Cuyo",
+        "alcohol": 14.2,
+        "maridajes": ["asado", "bife de chorizo", "empanadas de carne"],
+        "stock": 18,
+        "conocimiento": {
+            1: "Malbec D.O.C. Luján de Cuyo, cosecha 2021. Alcohol 14,2%.",
+            2: "Viñedos en Luján de Cuyo a unos 1.000 msnm. Suelos aluviales que aportan estructura y tanino pulido.",
+            3: "Luigi Bosca impulsó la Denominación de Origen Controlada de Luján de Cuyo, la primera DOC de América.",
+            4: "Los Malbec D.O.C. son la referencia de tipicidad mendocina frente a la moda de la alta altitud.",
+            5: "Lo recomendamos cuando el cliente pide un Malbec 'de verdad', con historia de origen y precio todavía razonable.",
         },
     },
     {
@@ -318,67 +359,146 @@ VINOS: list[dict] = [
 ]
 
 
+def _slug(nombre: str, cosecha: int | None) -> str:
+    base = re.sub(r"[^a-z0-9]+", "-", nombre.lower()).strip("-")
+    return f"{base}-{cosecha}" if cosecha else base
+
+
 async def seed(url: str) -> None:
     conn = await asyncpg.connect(url)
     try:
-        for vino in VINOS:
-            conocimiento = vino.pop("conocimiento")
-            stock_qty = vino.pop("stock")
-            maridajes = vino.get("maridajes", [])
-
-            vino_id = await conn.fetchval(
+        cols_vinos = {
+            r["column_name"]
+            for r in await conn.fetch(
                 """
-                INSERT INTO vinos (nombre, bodega, varietal, cosecha, precio,
-                    descripcion, region, sub_region, alcohol, maridajes)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-                ON CONFLICT DO NOTHING
-                RETURNING id
-                """,
+                SELECT column_name FROM information_schema.columns
+                WHERE table_schema = current_schema() AND table_name = 'vinos'
+                """
+            )
+        }
+        cols_stock = {
+            r["column_name"]
+            for r in await conn.fetch(
+                """
+                SELECT column_name FROM information_schema.columns
+                WHERE table_schema = current_schema() AND table_name = 'stock'
+                """
+            )
+        }
+
+        seeded = 0
+        for raw in VINOS:
+            vino = dict(raw)
+            conocimiento = dict(vino.pop("conocimiento"))
+            stock_qty = int(vino.pop("stock"))
+            maridajes = vino.pop("maridajes", [])
+            slug = _slug(str(vino["nombre"]), vino.get("cosecha"))
+            existing = await conn.fetchrow(
+                "SELECT id FROM vinos WHERE imagen_slug = $1 OR (nombre = $2 AND bodega = $3)",
+                slug,
                 vino["nombre"],
                 vino["bodega"],
-                vino["varietal"],
-                vino.get("cosecha"),
-                vino["precio"],
-                vino.get("descripcion"),
-                vino.get("region"),
-                vino.get("sub_region"),
-                vino.get("alcohol"),
-                maridajes,
+            )
+            vino_id = str(existing["id"]) if existing else slug
+
+            fields = {
+                "id": vino_id,
+                "nombre": vino["nombre"],
+                "bodega": vino["bodega"],
+                "varietal": vino.get("varietal") or "otro",
+                "anada": vino.get("cosecha"),
+                "precio": vino["precio"],
+                "descripcion": vino.get("descripcion"),
+                "region": vino.get("region"),
+                "alcohol": vino.get("alcohol"),
+                "activo": True,
+                "imagen_slug": slug,
+            }
+            if "precio_ars" in cols_vinos:
+                fields["precio_ars"] = vino["precio"]
+            if "anada_actual" in cols_vinos:
+                fields["anada_actual"] = vino.get("cosecha")
+            usable = {k: v for k, v in fields.items() if k in cols_vinos or k == "id"}
+            names = list(usable)
+            placeholders = ", ".join(f"${i + 1}" for i in range(len(names)))
+            updates = ", ".join(f"{n} = EXCLUDED.{n}" for n in names if n != "id")
+            await conn.execute(
+                f"""
+                INSERT INTO vinos ({", ".join(names)})
+                VALUES ({placeholders})
+                ON CONFLICT (id) DO UPDATE SET {updates}
+                """,
+                *[usable[n] for n in names],
+            )
+            if "imagen_slug" in cols_vinos:
+                await conn.execute(
+                    "UPDATE vinos SET imagen_slug = $2 WHERE id = $1",
+                    vino_id,
+                    slug,
+                )
+
+            stock_cols = ["producto_id", "cantidad_disponible", "reservado"]
+            stock_vals: list = [vino_id, stock_qty, 0]
+            if "cantidad" in cols_stock:
+                stock_cols.append("cantidad")
+                stock_vals.append(stock_qty)
+            stock_ph = ", ".join(f"${i + 1}" for i in range(len(stock_cols)))
+            await conn.execute(
+                f"""
+                INSERT INTO stock ({", ".join(stock_cols)})
+                VALUES ({stock_ph})
+                ON CONFLICT (producto_id) DO UPDATE
+                SET cantidad_disponible = EXCLUDED.cantidad_disponible,
+                    reservado = 0
+                """,
+                *stock_vals,
             )
 
-            if vino_id is None:
-                existing = await conn.fetchrow(
-                    "SELECT id FROM vinos WHERE nombre = $1 AND bodega = $2",
-                    vino["nombre"],
-                    vino["bodega"],
-                )
-                vino_id = existing["id"] if existing else None
-
-            if vino_id:
+            for capa, contenido in conocimiento.items():
+                extra = ""
+                if capa == 2 and vino.get("sub_region"):
+                    extra = f" Subregión: {vino['sub_region']}."
+                if capa == 5 and maridajes:
+                    extra = f" Maridajes: {', '.join(maridajes)}."
+                texto = f"{contenido}{extra}".strip()
+                frag_id = f"{slug}-c{capa}"
+                wk_cols = ["id", "producto_id", "capa", "contenido", "fuente", "validador_humano"]
+                wk_vals: list = [frag_id, vino_id, int(capa), texto, "sumiller", True]
+                wk_ph = ", ".join(f"${i + 1}" for i in range(len(wk_cols)))
                 await conn.execute(
-                    """
-                    INSERT INTO stock (vino_id, cantidad)
-                    VALUES ($1, $2)
-                    ON CONFLICT (vino_id, ubicacion) DO UPDATE SET cantidad = EXCLUDED.cantidad
+                    f"""
+                    INSERT INTO wine_knowledge ({", ".join(wk_cols)})
+                    VALUES ({wk_ph})
+                    ON CONFLICT (id) DO UPDATE SET
+                        contenido = EXCLUDED.contenido,
+                        fuente = EXCLUDED.fuente,
+                        validador_humano = EXCLUDED.validador_humano,
+                        producto_id = EXCLUDED.producto_id
                     """,
-                    vino_id,
-                    stock_qty,
+                    *wk_vals,
                 )
+            seeded += 1
 
-                for capa, contenido in conocimiento.items():
-                    await conn.execute(
-                        """
-                        INSERT INTO wine_knowledge (vino_id, capa, contenido, fuente)
-                        VALUES ($1, $2, $3, 'seed')
-                        ON CONFLICT DO NOTHING
-                        """,
-                        vino_id,
-                        capa,
-                        contenido,
-                    )
-
-        count = await conn.fetchval("SELECT COUNT(*) FROM vinos")
-        print(f"Seed completado: {count} vinos en catálogo.")
+        backfilled = await conn.execute(
+            """
+            UPDATE stock
+            SET cantidad_disponible = 8
+            WHERE COALESCE(cantidad_disponible, 0) = 0
+            """
+        )
+        total = await conn.fetchval("SELECT COUNT(*) FROM vinos WHERE activo = TRUE")
+        con_stock = await conn.fetchval(
+            """
+            SELECT COUNT(*) FROM stock
+            WHERE COALESCE(cantidad_disponible, 0) - COALESCE(reservado, 0) > 0
+            """
+        )
+        capas = await conn.fetchval("SELECT COUNT(*) FROM wine_knowledge WHERE fuente = 'sumiller'")
+        print(
+            f"Seed completado: {seeded} etiquetas demo, {total} vinos activos, "
+            f"{con_stock} con stock, {capas} fragmentos sumiller. "
+            f"Backfill stock: {backfilled}."
+        )
     finally:
         await conn.close()
 

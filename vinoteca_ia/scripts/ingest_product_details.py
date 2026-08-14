@@ -109,9 +109,7 @@ async def _ingestar(
     if not dry_run:
         url = database_url or os.environ.get("DATABASE_URL")
         if not url:
-            raise RuntimeError(
-                "DATABASE_URL no seteada. Pasá --database-url o cargá .env."
-            )
+            raise RuntimeError("DATABASE_URL no seteada. Pasá --database-url o cargá .env.")
         conn = await asyncpg.connect(url)
     else:
         conn = None
@@ -160,9 +158,7 @@ async def _procesar_lote(
             if fila.precio_ars is None or fila.precio_ars <= 0:
                 reporte.omitidos_sin_precio += 1
                 if len(reporte.muestras_omitidas) < 5:
-                    reporte.muestras_omitidas.append(
-                        f"sin precio: {fila.imagen_slug}"
-                    )
+                    reporte.muestras_omitidas.append(f"sin precio: {fila.imagen_slug}")
                 continue
         return
 
@@ -172,16 +168,13 @@ async def _procesar_lote(
             reporte.omitidos_incompletos += 1
             if len(reporte.muestras_omitidas) < 5:
                 reporte.muestras_omitidas.append(
-                    f"incompleto (L{numero}): "
-                    f"{fila.imagen_slug or fila.nombre or '(sin slug)'}"
+                    f"incompleto (L{numero}): {fila.imagen_slug or fila.nombre or '(sin slug)'}"
                 )
             continue
         if fila.precio_ars is None or fila.precio_ars <= 0:
             reporte.omitidos_sin_precio += 1
             if len(reporte.muestras_omitidas) < 5:
-                reporte.muestras_omitidas.append(
-                    f"sin precio (L{numero}): {fila.imagen_slug}"
-                )
+                reporte.muestras_omitidas.append(f"sin precio (L{numero}): {fila.imagen_slug}")
             continue
 
         try:

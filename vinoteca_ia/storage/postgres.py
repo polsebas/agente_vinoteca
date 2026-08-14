@@ -41,9 +41,7 @@ def _database_url(*, required: bool = True) -> str:
     if url:
         return url
     if required:
-        raise RuntimeError(
-            "DATABASE_URL no está configurada. Copiá .env.example a .env."
-        )
+        raise RuntimeError("DATABASE_URL no está configurada. Copiá .env.example a .env.")
     return _IMPORT_STUB_URL
 
 
@@ -78,6 +76,9 @@ async def fetchrow(query: str, *args: Any) -> asyncpg.Record | None:
     pool = await get_pool()
     async with pool.acquire() as conn:
         return await conn.fetchrow(query, *args)
+
+
+fetch_one = fetchrow
 
 
 async def execute(query: str, *args: Any) -> str:

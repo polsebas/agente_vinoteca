@@ -10,19 +10,12 @@ vía cron o el scheduler de AgentOS). Este endpoint es útil para:
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, Field
 
 from api.deps import admin_rate_limiter, require_admin_token
 from jobs.nightly_audit import correr_auditor
-from schemas.audit import AuditReport
+from schemas.audit import AuditReport, AuditRequest
 
 router = APIRouter(tags=["admin"])
-
-
-class AuditRequest(BaseModel):
-    """Parámetros del disparo manual."""
-
-    horas_atras: int = Field(default=24, ge=1, le=168)
 
 
 @router.post(

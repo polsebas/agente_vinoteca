@@ -5,11 +5,12 @@ Verifica Fase 1 → pausa → señal /aprobar → Fase 2 → log inmutable.
 
 from __future__ import annotations
 
+from decimal import Decimal
 from uuid import uuid4
 
 import pytest
 
-from schemas.order import OrderEstado, TipoEntrega
+from schemas.order import EstadoOrden, OrderEstado, TipoEntrega
 
 
 @pytest.mark.asyncio
@@ -29,40 +30,44 @@ async def test_idempotency_key_generacion():
 async def test_verificacion_stock_previene_fase2_sin_aprobacion():
     """
     El Two-Phase Commit NO puede avanzar a Fase 2 sin pasar por /aprobar.
-    Verificar que el estado del pedido es PENDIENTE_APROBACION después de Fase 1.
+    Tras Fase 1 el pedido queda PREPARADA (pendiente de aprobación humana).
     """
-    assert OrderEstado.PENDIENTE_APROBACION == "pendiente_aprobacion"
-    assert OrderEstado.CONFIRMADO == "confirmado"
-    assert OrderEstado.CANCELADO == "cancelado"
+    assert OrderEstado.PREPARADA == "preparada"
+    assert EstadoOrden.APROBADA == "aprobada"
+    assert EstadoOrden.CANCELADA == "cancelada"
+    assert OrderEstado is EstadoOrden
 
 
 @pytest.mark.asyncio
 async def test_estados_validos_para_aprobacion():
-    """Solo pedidos en PENDIENTE_APROBACION pueden ser aprobados."""
-    estados_aprobables = {OrderEstado.PENDIENTE_APROBACION}
+    """Solo pedidos en PREPARADA pueden ser aprobados (Fase 1 → Fase 2)."""
+    estados_aprobables = {EstadoOrden.PREPARADA}
     estados_no_aprobables = {
-        OrderEstado.PREPARANDO,
-        OrderEstado.CONFIRMADO,
-        OrderEstado.CANCELADO,
-        OrderEstado.FALLIDO,
+        EstadoOrden.APROBADA,
+        EstadoOrden.PAGADA,
+        EstadoOrden.CANCELADA,
+        EstadoOrden.FALLIDA,
     }
 
-    assert OrderEstado.PENDIENTE_APROBACION in estados_aprobables
-    assert OrderEstado.CONFIRMADO in estados_no_aprobables
-    assert OrderEstado.CANCELADO in estados_no_aprobables
+    assert EstadoOrden.PREPARADA in estados_aprobables
+    assert EstadoOrden.APROBADA in estados_no_aprobables
+    assert EstadoOrden.CANCELADA in estados_no_aprobables
 
 
 @pytest.mark.asyncio
 async def test_calcular_pedido_sin_mutacion():
     """
-    calcular_pedido no debe generar ninguna llamada a execute() (no muta DB).
+    calcular_orden no debe generar ninguna llamada a execute() (no muta DB).
     """
     from unittest.mock import AsyncMock, MagicMock, patch
 
     vino_id = uuid4()
     mock_row = MagicMock()
     mock_row.__getitem__ = lambda self, k: {
-        "id": vino_id, "nombre": "Zuccardi", "precio": 3200.0
+        "id": vino_id,
+        "nombre": "Zuccardi",
+        "precio": Decimal("3200.00"),
+        "activo": True,
     }[k]
 
     with (
@@ -70,16 +75,17 @@ async def test_calcular_pedido_sin_mutacion():
         patch("storage.postgres.execute", new_callable=AsyncMock) as mock_exec,
     ):
         mock_fetch.return_value = [mock_row]
-        from tools.orders.calculate_order import calcular_pedido
-        result = await calcular_pedido.entrypoint(
-            items=[{"vino_id": str(vino_id), "cantidad": 2}],
-            tipo_entrega="retiro",
+        from tools.orders.calculate_order import calcular_orden
+
+        result = await calcular_orden.entrypoint(
+            lineas=[{"vino_id": str(vino_id), "cantidad": 2}],
+            tipo_entrega=TipoEntrega.RETIRO_LOCAL,
         )
 
         mock_exec.assert_not_called()
 
-    assert result.total == 6400.0
-    assert result.envio == 0.0
+    assert result.total == Decimal("6400.00")
+    assert result.envio == Decimal("0.00")
     assert len(result.lineas) == 1
 
 
@@ -108,7 +114,8 @@ async def test_log_inmutable_registra_eventos():
 async def test_order_tipo_entrega():
     """El tipo de entrega determina si se cobra envío."""
     from tools.orders.calculate_order import COSTO_ENVIO
+
     assert COSTO_ENVIO > 0
 
-    assert TipoEntrega.RETIRO == "retiro"
-    assert TipoEntrega.ENVIO == "envio"
+    assert TipoEntrega.RETIRO_LOCAL == "retiro_local"
+    assert TipoEntrega.ENVIO_DOMICILIO == "envio_domicilio"

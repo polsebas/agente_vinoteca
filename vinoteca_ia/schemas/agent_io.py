@@ -8,34 +8,43 @@ from __future__ import annotations
 
 from decimal import Decimal
 from enum import StrEnum
-from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from schemas.order import OrderLineItem
+from schemas.wine_catalog import CatalogId
 
 
 class IntentClass(StrEnum):
     """Clases cerradas de intención que el router puede emitir."""
 
-    RECOMENDACION = "recomendacion"
+    RECOMENDACION_OCASION = "recomendacion_ocasion"
+    RECOMENDACION_REGALO = "recomendacion_regalo"
     MARIDAJE = "maridaje"
-    CONSULTA_INVENTARIO = "consulta_inventario"
-    PEDIDO = "pedido"
-    SOPORTE = "soporte"
-    EVENTO = "evento"
+    CONSULTA_STOCK_PRECIO = "consulta_stock_precio"
+    PEDIDO_DELIVERY = "pedido_delivery"
+    EVENTO_DEGUSTACION = "evento_degustacion"
+    SOPORTE_RECLAMO = "soporte_reclamo"
     DESCONOCIDO = "desconocido"
+    # Aliases históricos (mismos strings que las clases canónicas).
+    RECOMENDACION = "recomendacion_ocasion"
+    CONSULTA_INVENTARIO = "consulta_stock_precio"
+    PEDIDO = "pedido_delivery"
+    SOPORTE = "soporte_reclamo"
+    EVENTO = "evento_degustacion"
 
 
 class AgenteDestino(StrEnum):
     """Agentes especialistas disponibles para derivación.
 
-    Debe coincidir con los `members` del Team router (`router_team.py`):
-    sommelier, orders, support. No existe agente de eventos separado: la
-    intención `evento` se deriva a soporte (catas, reservas, info de local).
+    Debe coincidir con los `members` del Team router (`router_team.py`).
     """
 
     SOMMELIER = "agente_sommelier"
     ORDERS = "agente_orders"
+    INVENTORY = "agente_inventario"
     SUPPORT = "agente_support"
+    EVENTS = "agente_events"
     NINGUNO = "ninguno"
 
 
@@ -49,6 +58,18 @@ class RouterOutput(BaseModel):
     agente_destino: AgenteDestino
     razonamiento: str = Field(
         description="Una oración. Invisible al cliente. Sirve para tracing.",
+    )
+    accion_nula: bool = Field(
+        default=False,
+        description="True si confianza < 0.85 o el mensaje es ambiguo.",
+    )
+    pregunta_aclaracion: str | None = Field(
+        default=None,
+        description="Pregunta al cliente cuando accion_nula=True.",
+    )
+    correlation_id: str | None = Field(
+        default=None,
+        description="Propagar el correlation_id del request. Formato corr_<session_id>.",
     )
 
 
@@ -81,9 +102,9 @@ class AgentResponse(BaseModel):
 class VinoSugerido(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    vino_id: UUID
+    vino_id: CatalogId
     nombre: str
-    precio_ars: Decimal
+    precio_ars: Decimal | None = None
     razon_recomendacion: str
 
 
@@ -97,18 +118,11 @@ class SommelierResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     mensaje_cliente: str
-    sugeridos: list[VinoSugerido] = Field(default_factory=list, max_length=5)
+    sugeridos: list[VinoSugerido] = Field(default_factory=list, max_length=3)
     requiere_mas_info: bool = False
 
 
-class LineaResumenPedido(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    vino_id: UUID
-    nombre: str
-    cantidad: int = Field(ge=1)
-    precio_unitario_ars: Decimal
-    subtotal_ars: Decimal
+LineaResumenPedido = OrderLineItem
 
 
 class OrderResponse(BaseModel):
@@ -121,8 +135,8 @@ class OrderResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     mensaje_cliente: str
-    order_id: UUID | None = None
-    lineas: list[LineaResumenPedido] = Field(default_factory=list)
+    order_id: str | None = None
+    lineas: list[OrderLineItem] = Field(default_factory=list)
     total_ars: Decimal | None = None
     requiere_aprobacion: bool = False
     payment_link: str | None = None
@@ -136,3 +150,22 @@ class SupportResponse(BaseModel):
     mensaje_cliente: str
     escalado_a_humano: bool = False
     ticket_id: str | None = None
+
+
+class InventoryResponse(BaseModel):
+    """Respuesta del agente de inventario (SQL puro)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mensaje_cliente: str
+    encontrado: bool = True
+
+
+class EventsResponse(BaseModel):
+    """Respuesta del agente de eventos (catas y reservas)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mensaje_cliente: str
+    reserva_id: str | None = None
+    requiere_confirmacion: bool = False

@@ -20,8 +20,13 @@ from typing import Any
 
 from agno.db.base import SessionType
 from agno.tools import tool
-from pydantic import BaseModel, ConfigDict, Field
 
+from schemas.audit import (
+    RunAuditable,
+    RunsAuditablesResponse,
+    ToolCallArgument,
+    ToolCallRecord,
+)
 from storage.postgres import get_agno_db
 
 _AGENTES_AUDITABLES = {
@@ -29,43 +34,6 @@ _AGENTES_AUDITABLES = {
     "agente_orders",
     "agente_support",
 }
-
-
-class RunAuditable(BaseModel):
-    """Proyección mínima de un run para el juez."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    run_id: str
-    session_id: str
-    agente_nombre: str
-    user_id: str | None = None
-    input_usuario: str = Field(default="")
-    output_agente: str = Field(default="")
-    tool_calls: list[dict[str, Any]] = Field(default_factory=list)
-    created_at: datetime
-
-
-class RunsAuditablesResponse(BaseModel):
-    """Respuesta de `listar_runs_auditables`.
-
-    `runs_devueltos` es el conteo real devuelto; `truncado` indica si se alcanzó
-    el límite y quedaron runs afuera. No intentamos estimar un "total en ventana"
-    para no mentir.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    ventana_desde: datetime
-    ventana_hasta: datetime
-    runs_devueltos: int
-    truncado: bool
-    runs: list[RunAuditable]
-
-    @property
-    def total(self) -> int:
-        """Alias de compatibilidad hacia atrás para consumidores antiguos."""
-        return self.runs_devueltos
 
 
 async def fetch_audit_runs_window(
@@ -142,9 +110,7 @@ async def fetch_audit_runs_window(
                     truncado = True
                     break
                 child_dict = _to_dict(child)
-                agent_id = str(
-                    child_dict.get("agent_id") or child_dict.get("agent_name") or ""
-                )
+                agent_id = str(child_dict.get("agent_id") or child_dict.get("agent_name") or "")
                 if agent_id not in _AGENTES_AUDITABLES:
                     continue
                 if agente and agent_id != agente:
@@ -192,9 +158,7 @@ async def listar_runs_auditables(
         `RunsAuditablesResponse` con ventana, conteo devuelto, flag de truncado
         y la lista de runs.
     """
-    return await fetch_audit_runs_window(
-        horas_atras=horas_atras, limite=limite, agente=agente
-    )
+    return await fetch_audit_runs_window(horas_atras=horas_atras, limite=limite, agente=agente)
 
 
 def _iter_member_runs(team_run: Any):
@@ -280,19 +244,32 @@ def _extraer_output(run: dict[str, Any]) -> str:
     return ""
 
 
-def _extraer_tool_calls(run: dict[str, Any]) -> list[dict[str, Any]]:
+def _extraer_tool_calls(run: dict[str, Any]) -> list[ToolCallRecord]:
     tools = run.get("tools") or []
-    proyectado: list[dict[str, Any]] = []
+    proyectado: list[ToolCallRecord] = []
     for t in tools:
         td = t if isinstance(t, dict) else _to_dict(t)
+        raw_args = td.get("tool_args")
+        argumentos: list[ToolCallArgument] = []
+        if isinstance(raw_args, dict):
+            argumentos = [
+                ToolCallArgument(
+                    clave=str(k),
+                    valor=v if isinstance(v, str) else json.dumps(v, default=str),
+                )
+                for k, v in raw_args.items()
+            ]
+        elif raw_args is not None:
+            argumentos = [ToolCallArgument(clave="raw", valor=str(raw_args))]
+        raw_err = td.get("tool_call_error")
         proyectado.append(
-            {
-                "tool_name": td.get("tool_name"),
-                "tool_args": td.get("tool_args"),
-                "error": td.get("tool_call_error"),
-                "confirmed": td.get("confirmed"),
-                "requires_confirmation": td.get("requires_confirmation"),
-            }
+            ToolCallRecord(
+                tool_name=td.get("tool_name"),
+                argumentos=argumentos,
+                error=None if raw_err is None else bool(raw_err),
+                confirmed=td.get("confirmed"),
+                requires_confirmation=td.get("requires_confirmation"),
+            )
         )
     return proyectado
 
