@@ -35,13 +35,15 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
 from agents.auditor_agent import crear_agente_auditor
-from agents.router_agent import crear_agente_router
+from agents.judge_agent import get_judge_agent
+from agents.router_agent import get_router_agent
 from agents.router_team import crear_router_team
 from storage.postgres import get_agno_db
 
 AGENT_FACTORIES: list[Callable[[], Agent]] = [
-    crear_agente_router,
+    get_router_agent,
     crear_agente_auditor,
+    get_judge_agent,
 ]
 
 TEAM_FACTORIES: list[Callable[[], Team]] = [
@@ -115,11 +117,7 @@ class InternalPathsGuard(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
-        if (
-            self._is_public(path)
-            or self._is_loopback(request)
-            or self._relax_loopback_guard
-        ):
+        if self._is_public(path) or self._is_loopback(request) or self._relax_loopback_guard:
             return await call_next(request)
         return JSONResponse(status_code=404, content={"detail": "Not Found"})
 
@@ -182,10 +180,7 @@ def build_agent_os(*, base_app: FastAPI) -> AgentOS:
 
     return AgentOS(
         name="Vinoteca IA",
-        description=(
-            "Sistema multi-agente para vinoteca (Sommelier + Orders + "
-            "Support + Router)."
-        ),
+        description=("Sistema multi-agente para vinoteca (Sommelier + Orders + Support + Router)."),
         version="1.0.0",
         db=get_agno_db(),
         agents=[factory() for factory in AGENT_FACTORIES],

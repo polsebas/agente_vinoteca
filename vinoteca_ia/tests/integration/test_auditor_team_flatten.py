@@ -108,9 +108,7 @@ async def test_fetch_window_flattens_team_members():
 async def test_fetch_window_marks_truncado_when_limit_reached():
     from tools.audit.fetch_runs import fetch_audit_runs_window
 
-    many_runs = [
-        {"run_id": f"r-{i}", "content": "x", "tools": []} for i in range(10)
-    ]
+    many_runs = [{"run_id": f"r-{i}", "content": "x", "tools": []} for i in range(10)]
     agent_sessions = [_agent_session("agente_sommelier", many_runs)]
 
     with patch(

@@ -8,6 +8,9 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from schemas.customer_profile import PerfilClienteTipo
+from schemas.order import CalculatedOrder
+
 
 class Canal(StrEnum):
     """Canal por el que entra el mensaje del cliente."""
@@ -29,6 +32,8 @@ class EstadoPedidoPendiente(StrEnum):
 class TurnoHistorial(BaseModel):
     """Un turno individual del diálogo."""
 
+    model_config = ConfigDict(extra="forbid")
+
     rol: str
     contenido: str
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
@@ -44,7 +49,7 @@ class SessionState(BaseModel):
     cognitivo del agente.
     """
 
-    model_config = ConfigDict(frozen=False, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     session_id: str
     correlation_id: str
@@ -53,8 +58,11 @@ class SessionState(BaseModel):
     historial: list[TurnoHistorial] = Field(default_factory=list)
     pedido_pendiente_id: UUID | None = None
     pedido_pendiente_estado: EstadoPedidoPendiente = EstadoPedidoPendiente.NINGUNO
+    pedido_en_preparacion: CalculatedOrder | None = None
+    perfil_inferido: PerfilClienteTipo = PerfilClienteTipo.GENERAL
     run_id_pausado: str | None = None
     pasos_actuales: int = 0
+    max_pasos: int = 5
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 

@@ -1,0 +1,839 @@
+[
+  {
+    "id": "golden-01",
+    "category": "sommelier_coleccionista",
+    "client_profile": "coleccionista",
+    "input": "Busco un Malbec de Gualtallary con suelo calcáreo, no el más comercial.",
+    "expected_intent": "recomendacion_ocasion",
+    "expected_tools": [
+      "buscar_por_ocasion",
+      "consultar_stock"
+    ],
+    "expected_response_elements": [
+      "Gualtallary",
+      "calcáreo",
+      "stock"
+    ],
+    "expected_layer": 2
+  },
+  {
+    "id": "golden-02",
+    "category": "sommelier_coleccionista",
+    "client_profile": "coleccionista",
+    "input": "Comparame la 2019 y la 2022 de Achaval Ferrer Malbec en taninos y guarda.",
+    "expected_intent": "consulta_stock_precio",
+    "expected_tools": [
+      "comparar_anadas",
+      "consultar_precio"
+    ],
+    "expected_response_elements": [
+      "2019",
+      "2022",
+      "guarda"
+    ],
+    "expected_layer": 2
+  },
+  {
+    "id": "golden-03",
+    "category": "sommelier_coleccionista",
+    "client_profile": "coleccionista",
+    "input": "Quiero potencial de guarda 10 años, altura sobre 1100 msnm, presupuesto 50 mil.",
+    "expected_intent": "maridaje",
+    "expected_tools": [
+      "buscar_por_maridaje",
+      "consultar_stock"
+    ],
+    "expected_response_elements": [
+      "guarda",
+      "msnm",
+      "SQL"
+    ],
+    "expected_layer": 2
+  },
+  {
+    "id": "golden-04",
+    "category": "sommelier_coleccionista",
+    "client_profile": "coleccionista",
+    "input": "Contame el microclima de Paraje Altamira para un Cabernet de colección.",
+    "expected_intent": "recomendacion_ocasion",
+    "expected_tools": [
+      "buscar_por_ocasion"
+    ],
+    "expected_response_elements": [
+      "Altamira",
+      "microclima",
+      "Cabernet"
+    ],
+    "expected_layer": 2
+  },
+  {
+    "id": "golden-05",
+    "category": "sommelier_coleccionista",
+    "client_profile": "coleccionista",
+    "input": "¿El Achaval 2020 tiene más expresión de terroir que el 2018? Precio SQL.",
+    "expected_intent": "consulta_stock_precio",
+    "expected_tools": [
+      "comparar_anadas",
+      "consultar_precio"
+    ],
+    "expected_response_elements": [
+      "terroir",
+      "precio",
+      "SQL"
+    ],
+    "expected_layer": 2
+  },
+  {
+    "id": "golden-06",
+    "category": "sommelier_coleccionista",
+    "client_profile": "coleccionista",
+    "input": "Necesito un blend de altura con notas de enología: huevo de concreto, sin maquillaje.",
+    "expected_intent": "recomendacion_ocasion",
+    "expected_tools": [
+      "buscar_por_ocasion",
+      "consultar_stock"
+    ],
+    "expected_response_elements": [
+      "concreto",
+      "altura",
+      "stock"
+    ],
+    "expected_layer": 3
+  },
+  {
+    "id": "golden-07",
+    "category": "sommelier_coleccionista",
+    "client_profile": "coleccionista",
+    "input": "Regalo para un coleccionista: Catena Adrianna vs Achaval Finca Mirador.",
+    "expected_intent": "recomendacion_regalo",
+    "expected_tools": [
+      "comparar_anadas",
+      "consultar_stock"
+    ],
+    "expected_response_elements": [
+      "Adrianna",
+      "Mirador",
+      "stock"
+    ],
+    "expected_layer": 2
+  },
+  {
+    "id": "golden-08",
+    "category": "sommelier_coleccionista",
+    "client_profile": "coleccionista",
+    "input": "Maridaje de bife de chorizo con un Malbec de suelos aluviales de Uco.",
+    "expected_intent": "maridaje",
+    "expected_tools": [
+      "buscar_por_maridaje",
+      "consultar_stock"
+    ],
+    "expected_response_elements": [
+      "aluviales",
+      "Uco",
+      "bife"
+    ],
+    "expected_layer": 2
+  },
+  {
+    "id": "golden-09",
+    "category": "sommelier_coleccionista",
+    "client_profile": "coleccionista",
+    "input": "¿Hay stock de la vertical 2018-2021 de Zuccardi Finca Piedra Infinita?",
+    "expected_intent": "consulta_stock_precio",
+    "expected_tools": [
+      "consultar_stock",
+      "comparar_anadas"
+    ],
+    "expected_response_elements": [
+      "stock",
+      "vertical",
+      "Zuccardi"
+    ],
+    "expected_layer": 2
+  },
+  {
+    "id": "golden-10",
+    "category": "sommelier_coleccionista",
+    "client_profile": "coleccionista",
+    "input": "Quiero la cata del sumiller de un Malbec de Gualtallary, no la ficha de marketing.",
+    "expected_intent": "recomendacion_ocasion",
+    "expected_tools": [
+      "buscar_por_ocasion"
+    ],
+    "expected_response_elements": [
+      "sumiller",
+      "Gualtallary",
+      "cata"
+    ],
+    "expected_layer": 5
+  },
+  {
+    "id": "golden-11",
+    "category": "sommelier_curioso",
+    "client_profile": "curioso",
+    "input": "No sé mucho de vinos, quiero algo rico para un viernes en casa.",
+    "expected_intent": "recomendacion_ocasion",
+    "expected_tools": [
+      "buscar_por_ocasion",
+      "consultar_stock"
+    ],
+    "expected_response_elements": [
+      "Malbec",
+      "stock",
+      "fácil"
+    ],
+    "expected_layer": 3
+  },
+  {
+    "id": "golden-12",
+    "category": "sommelier_curioso",
+    "client_profile": "curioso",
+    "input": "Regalo para mi cuñada que recién se inicia, que no parezca soberbio.",
+    "expected_intent": "recomendacion_regalo",
+    "expected_tools": [
+      "buscar_por_ocasion",
+      "consultar_stock"
+    ],
+    "expected_response_elements": [
+      "Torrontés",
+      "historia",
+      "stock"
+    ],
+    "expected_layer": 3
+  },
+  {
+    "id": "golden-13",
+    "category": "sommelier_curioso",
+    "client_profile": "curioso",
+    "input": "¿Qué tomo con pizza de muzzarella? Algo accesible.",
+    "expected_intent": "maridaje",
+    "expected_tools": [
+      "buscar_por_maridaje",
+      "consultar_stock"
+    ],
+    "expected_response_elements": [
+      "pizza",
+      "Bonarda",
+      "stock"
+    ],
+    "expected_layer": 1
+  },
+  {
+    "id": "golden-14",
+    "category": "sommelier_curioso",
+    "client_profile": "curioso",
+    "input": "Contame la historia de una bodega familiar de Mendoza, en dos líneas.",
+    "expected_intent": "recomendacion_ocasion",
+    "expected_tools": [
+      "buscar_por_ocasion"
+    ],
+    "expected_response_elements": [
+      "familia",
+      "Mendoza",
+      "historia"
+    ],
+    "expected_layer": 3
+  },
+  {
+    "id": "golden-15",
+    "category": "sommelier_curioso",
+    "client_profile": "curioso",
+    "input": "¿Qué es un vino orgánico o natural y tenés alguno rico y no caro?",
+    "expected_intent": "recomendacion_ocasion",
+    "expected_tools": [
+      "buscar_por_ocasion",
+      "consultar_stock"
+    ],
+    "expected_response_elements": [
+      "orgánico",
+      "natural",
+      "precio"
+    ],
+    "expected_layer": 4
+  },
+  {
+    "id": "golden-16",
+    "category": "sommelier_curioso",
+    "client_profile": "curioso",
+    "input": "Quiero un tinto que huela a flores y no me intimide con taninos.",
+    "expected_intent": "recomendacion_ocasion",
+    "expected_tools": [
+      "buscar_por_ocasion",
+      "consultar_stock"
+    ],
+    "expected_response_elements": [
+      "taninos",
+      "accesible",
+      "stock"
+    ],
+    "expected_layer": 4
+  },
+  {
+    "id": "golden-17",
+    "category": "sommelier_curioso",
+    "client_profile": "curioso",
+    "input": "Explicame por qué el Malbec es el varietal argentino, sin tecnicismos.",
+    "expected_intent": "recomendacion_ocasion",
+    "expected_tools": [
+      "buscar_por_ocasion"
+    ],
+    "expected_response_elements": [
+      "Malbec",
+      "argentina",
+      "historia"
+    ],
+    "expected_layer": 3
+  },
+  {
+    "id": "golden-18",
+    "category": "sommelier_curioso",
+    "client_profile": "curioso",
+    "input": "Un blanco para arrancar: ¿Torrontés o Sauvignon? Presupuesto 12 mil.",
+    "expected_intent": "recomendacion_ocasion",
+    "expected_tools": [
+      "consultar_precio",
+      "consultar_stock"
+    ],
+    "expected_response_elements": [
+      "Torrontés",
+      "Sauvignon",
+      "SQL"
+    ],
+    "expected_layer": 1
+  },
+  {
+    "id": "golden-19",
+    "category": "sommelier_curioso",
+    "client_profile": "curioso",
+    "input": "Vi en redes que está de moda el naranjo. ¿Tenés algo aproximado y rico?",
+    "expected_intent": "recomendacion_ocasion",
+    "expected_tools": [
+      "buscar_por_ocasion",
+      "consultar_stock"
+    ],
+    "expected_response_elements": [
+      "naranjo",
+      "tendencia",
+      "stock"
+    ],
+    "expected_layer": 4
+  },
+  {
+    "id": "golden-20",
+    "category": "sommelier_curioso",
+    "client_profile": "curioso",
+    "input": "Quiero aprender: ¿qué significa 'crianza en roble' en una frase?",
+    "expected_intent": "recomendacion_ocasion",
+    "expected_tools": [
+      "buscar_por_ocasion"
+    ],
+    "expected_response_elements": [
+      "roble",
+      "crianza",
+      "simple"
+    ],
+    "expected_layer": 3
+  },
+  {
+    "id": "golden-21",
+    "category": "sommelier_ocasion",
+    "client_profile": "ocasion",
+    "input": "Asado el sábado para 8, ¿qué llevo que no falle?",
+    "expected_intent": "recomendacion_ocasion",
+    "expected_tools": [
+      "buscar_por_ocasion",
+      "consultar_stock"
+    ],
+    "expected_response_elements": [
+      "asado",
+      "Malbec",
+      "botellas"
+    ],
+    "expected_layer": 1
+  },
+  {
+    "id": "golden-22",
+    "category": "sommelier_ocasion",
+    "client_profile": "ocasion",
+    "input": "¿Qué vino para un asado de cordero?",
+    "expected_intent": "maridaje",
+    "expected_tools": [
+      "buscar_por_maridaje",
+      "consultar_stock"
+    ],
+    "expected_response_elements": [
+      "cordero",
+      "Malbec",
+      "stock"
+    ],
+    "expected_layer": 1
+  },
+  {
+    "id": "golden-23",
+    "category": "sommelier_ocasion",
+    "client_profile": "ocasion",
+    "input": "Cena con los suegros, tinto no muy pesado, que quede bien.",
+    "expected_intent": "recomendacion_ocasion",
+    "expected_tools": [
+      "buscar_por_ocasion",
+      "consultar_stock"
+    ],
+    "expected_response_elements": [
+      "Pinot",
+      "acidez",
+      "stock"
+    ],
+    "expected_layer": 1
+  },
+  {
+    "id": "golden-24",
+    "category": "sommelier_ocasion",
+    "client_profile": "ocasion",
+    "input": "Regalo de cumpleaños con packaging lindo, Malbec de hasta 20 mil.",
+    "expected_intent": "recomendacion_regalo",
+    "expected_tools": [
+      "buscar_por_ocasion",
+      "consultar_precio"
+    ],
+    "expected_response_elements": [
+      "regalo",
+      "packaging",
+      "precio"
+    ],
+    "expected_layer": 1
+  },
+  {
+    "id": "golden-25",
+    "category": "sommelier_ocasion",
+    "client_profile": "ocasion",
+    "input": "Asado de tira + achuras, 3 botellas, zona Palermo.",
+    "expected_intent": "maridaje",
+    "expected_tools": [
+      "buscar_por_maridaje",
+      "consultar_zona_entrega"
+    ],
+    "expected_response_elements": [
+      "asado",
+      "Palermo",
+      "botellas"
+    ],
+    "expected_layer": 1
+  },
+  {
+    "id": "golden-26",
+    "category": "sommelier_ocasion",
+    "client_profile": "ocasion",
+    "input": "Almuerzo de domingo con empanadas y ensalada, ¿tinto o blanco?",
+    "expected_intent": "maridaje",
+    "expected_tools": [
+      "buscar_por_maridaje",
+      "consultar_stock"
+    ],
+    "expected_response_elements": [
+      "empanadas",
+      "stock"
+    ],
+    "expected_layer": 1
+  },
+  {
+    "id": "golden-27",
+    "category": "sommelier_ocasion",
+    "client_profile": "ocasion",
+    "input": "Parrillada mixta para 6, que el vino no robe protagonismo.",
+    "expected_intent": "recomendacion_ocasion",
+    "expected_tools": [
+      "buscar_por_ocasion",
+      "consultar_stock"
+    ],
+    "expected_response_elements": [
+      "parrilla",
+      "6",
+      "stock"
+    ],
+    "expected_layer": 1
+  },
+  {
+    "id": "golden-28",
+    "category": "sommelier_ocasion",
+    "client_profile": "ocasion",
+    "input": "Cena romántica: un tinto elegante, no el más caro de la góndola.",
+    "expected_intent": "recomendacion_ocasion",
+    "expected_tools": [
+      "buscar_por_ocasion",
+      "consultar_precio"
+    ],
+    "expected_response_elements": [
+      "elegante",
+      "precio",
+      "SQL"
+    ],
+    "expected_layer": 5
+  },
+  {
+    "id": "golden-29",
+    "category": "sommelier_ocasion",
+    "client_profile": "ocasion",
+    "input": "Cumpleaños de mi viejo, le gusta tinto pero no muy pesado.",
+    "expected_intent": "recomendacion_ocasion",
+    "expected_tools": [
+      "buscar_por_ocasion",
+      "consultar_stock"
+    ],
+    "expected_response_elements": [
+      "Pinot",
+      "Patagonia",
+      "stock"
+    ],
+    "expected_layer": 1
+  },
+  {
+    "id": "golden-30",
+    "category": "sommelier_ocasion",
+    "client_profile": "ocasion",
+    "input": "Llevo vino a una casa de campo: asado y postre de chocolate.",
+    "expected_intent": "maridaje",
+    "expected_tools": [
+      "buscar_por_maridaje",
+      "consultar_stock"
+    ],
+    "expected_response_elements": [
+      "asado",
+      "chocolate",
+      "stock"
+    ],
+    "expected_layer": 1
+  },
+  {
+    "id": "golden-31",
+    "category": "orders_2pc",
+    "client_profile": "ocasion",
+    "input": "Quiero 2 Malbec joven a domicilio en Palermo.",
+    "expected_intent": "pedido_delivery",
+    "expected_tools": [
+      "calcular_orden",
+      "consultar_zona_entrega",
+      "verificar_stock_exacto"
+    ],
+    "expected_response_elements": [
+      "resumen",
+      "confirmo",
+      "envío"
+    ],
+    "expected_layer": 1
+  },
+  {
+    "id": "golden-32",
+    "category": "orders_2pc",
+    "client_profile": "curioso",
+    "input": "confirmo",
+    "expected_intent": "pedido_delivery",
+    "expected_tools": [
+      "crear_orden"
+    ],
+    "expected_response_elements": [
+      "PED-",
+      "APROBADA",
+      "link"
+    ],
+    "expected_layer": 1
+  },
+  {
+    "id": "golden-33",
+    "category": "orders_2pc",
+    "client_profile": "ocasion",
+    "input": "Llevame 6 botellas de Malbec, ¿llego al envío gratis?",
+    "expected_intent": "pedido_delivery",
+    "expected_tools": [
+      "calcular_orden",
+      "verificar_stock_exacto"
+    ],
+    "expected_response_elements": [
+      "envío gratis",
+      "resumen",
+      "confirmo"
+    ],
+    "expected_layer": 1
+  },
+  {
+    "id": "golden-34",
+    "category": "orders_2pc",
+    "client_profile": "curioso",
+    "input": "Quiero 3 Achaval 2022, pasame el resumen antes de cobrar.",
+    "expected_intent": "pedido_delivery",
+    "expected_tools": [
+      "calcular_orden",
+      "verificar_stock_exacto"
+    ],
+    "expected_response_elements": [
+      "resumen",
+      "total",
+      "confirmo"
+    ],
+    "expected_layer": 1
+  },
+  {
+    "id": "golden-35",
+    "category": "orders_2pc",
+    "client_profile": "ocasion",
+    "input": "Llevame 3 Achaval 2022, confirmo el resumen que me pasaste.",
+    "expected_intent": "pedido_delivery",
+    "expected_tools": [
+      "crear_orden",
+      "enviar_link_pago"
+    ],
+    "expected_response_elements": [
+      "PED-",
+      "link",
+      "Mercado Pago"
+    ],
+    "expected_layer": 1
+  },
+  {
+    "id": "golden-36",
+    "category": "orders_2pc",
+    "client_profile": "curioso",
+    "input": "Retiro en el local: 4 Bonarda. Calculá sin envío.",
+    "expected_intent": "pedido_delivery",
+    "expected_tools": [
+      "calcular_orden",
+      "verificar_stock_exacto"
+    ],
+    "expected_response_elements": [
+      "retiro",
+      "resumen",
+      "confirmo"
+    ],
+    "expected_layer": 1
+  },
+  {
+    "id": "golden-37",
+    "category": "orders_2pc",
+    "client_profile": "ocasion",
+    "input": "¿Me armás 2 Catena Malbec 2021 a Caballito? Todavía no confirmes.",
+    "expected_intent": "pedido_delivery",
+    "expected_tools": [
+      "calcular_orden",
+      "consultar_zona_entrega"
+    ],
+    "expected_response_elements": [
+      "Caballito",
+      "resumen",
+      "confirmo"
+    ],
+    "expected_layer": 1
+  },
+  {
+    "id": "golden-38",
+    "category": "orders_2pc",
+    "client_profile": "curioso",
+    "input": "confirmo el pedido de Caballito",
+    "expected_intent": "pedido_delivery",
+    "expected_tools": [
+      "crear_orden"
+    ],
+    "expected_response_elements": [
+      "PED-",
+      "reservado",
+      "pago"
+    ],
+    "expected_layer": 1
+  },
+  {
+    "id": "golden-39",
+    "category": "orders_2pc",
+    "client_profile": "ocasion",
+    "input": "Quiero 12 botellas para un evento, aplicá descuento por volumen y mostrame total.",
+    "expected_intent": "pedido_delivery",
+    "expected_tools": [
+      "calcular_orden",
+      "verificar_stock_exacto"
+    ],
+    "expected_response_elements": [
+      "descuento",
+      "volumen",
+      "confirmo"
+    ],
+    "expected_layer": 1
+  },
+  {
+    "id": "golden-40",
+    "category": "orders_2pc",
+    "client_profile": "curioso",
+    "input": "Cancelá, no confirmé nada: no cubras la tarjeta.",
+    "expected_intent": "pedido_delivery",
+    "expected_tools": [
+      "consultar_estado_pedido"
+    ],
+    "expected_response_elements": [
+      "sin cobro",
+      "2PC",
+      "confirmar"
+    ],
+    "expected_layer": 1
+  },
+  {
+    "id": "golden-41",
+    "category": "inventory",
+    "client_profile": "curioso",
+    "input": "¿Tenés Catena Zapata Estiba 2018 y a cuánto está?",
+    "expected_intent": "consulta_stock_precio",
+    "expected_tools": [
+      "consultar_stock",
+      "consultar_precio"
+    ],
+    "expected_response_elements": [
+      "SQL",
+      "precio",
+      "stock"
+    ],
+    "expected_layer": 1
+  },
+  {
+    "id": "golden-42",
+    "category": "inventory",
+    "client_profile": "curioso",
+    "input": "Precio y stock del Achaval Malbec 2022, sin inventar.",
+    "expected_intent": "consulta_stock_precio",
+    "expected_tools": [
+      "consultar_precio",
+      "consultar_stock"
+    ],
+    "expected_response_elements": [
+      "SQL",
+      "Achaval",
+      "cantidad"
+    ],
+    "expected_layer": 1
+  },
+  {
+    "id": "golden-43",
+    "category": "inventory",
+    "client_profile": "curioso",
+    "input": "¿Llegan a código postal 1414 (Villa Crespo)?",
+    "expected_intent": "consulta_stock_precio",
+    "expected_tools": [
+      "consultar_zona_entrega"
+    ],
+    "expected_response_elements": [
+      "zona",
+      "1414",
+      "envío"
+    ],
+    "expected_layer": 1
+  },
+  {
+    "id": "golden-44",
+    "category": "inventory",
+    "client_profile": "curioso",
+    "input": "¿Hay añada 2020 de Luigi Bosca De Sangre en depósito?",
+    "expected_intent": "consulta_stock_precio",
+    "expected_tools": [
+      "consultar_stock",
+      "comparar_anadas"
+    ],
+    "expected_response_elements": [
+      "2020",
+      "stock",
+      "SQL"
+    ],
+    "expected_layer": 1
+  },
+  {
+    "id": "golden-45",
+    "category": "inventory",
+    "client_profile": "curioso",
+    "input": "Si el Torrontés Cafayate está en 0, ¿qué alternativa hay en SQL?",
+    "expected_intent": "consulta_stock_precio",
+    "expected_tools": [
+      "consultar_stock"
+    ],
+    "expected_response_elements": [
+      "sin stock",
+      "alternativa",
+      "SQL"
+    ],
+    "expected_layer": 1
+  },
+  {
+    "id": "golden-46",
+    "category": "events",
+    "client_profile": "ocasion",
+    "input": "¿Hay cata de Malbec este mes?",
+    "expected_intent": "evento_degustacion",
+    "expected_tools": [
+      "consultar_eventos"
+    ],
+    "expected_response_elements": [
+      "cata",
+      "cupos",
+      "fecha"
+    ],
+    "expected_layer": 1
+  },
+  {
+    "id": "golden-47",
+    "category": "events",
+    "client_profile": "ocasion",
+    "input": "Reservame 2 lugares para la cata de Valle de Uco del 22/08.",
+    "expected_intent": "evento_degustacion",
+    "expected_tools": [
+      "consultar_eventos",
+      "reservar_evento"
+    ],
+    "expected_response_elements": [
+      "reserva",
+      "2",
+      "confirmar"
+    ],
+    "expected_layer": 1
+  },
+  {
+    "id": "golden-48",
+    "category": "events",
+    "client_profile": "ocasion",
+    "input": "¿Quedan cupos para la degustación de orgánicos?",
+    "expected_intent": "evento_degustacion",
+    "expected_tools": [
+      "consultar_eventos"
+    ],
+    "expected_response_elements": [
+      "cupos",
+      "orgánicos",
+      "SQL"
+    ],
+    "expected_layer": 1
+  },
+  {
+    "id": "golden-49",
+    "category": "events",
+    "client_profile": "coleccionista",
+    "input": "Armame una visita + cata para un coleccionista el sábado.",
+    "expected_intent": "evento_degustacion",
+    "expected_tools": [
+      "consultar_eventos",
+      "reservar_evento"
+    ],
+    "expected_response_elements": [
+      "cata",
+      "sábado",
+      "cupo"
+    ],
+    "expected_layer": 1
+  },
+  {
+    "id": "golden-50",
+    "category": "events",
+    "client_profile": "ocasion",
+    "input": "Cancelo la reserva de la cata si todavía no pagué.",
+    "expected_intent": "evento_degustacion",
+    "expected_tools": [
+      "consultar_eventos"
+    ],
+    "expected_response_elements": [
+      "reserva",
+      "sin cobro",
+      "estado"
+    ],
+    "expected_layer": 1
+  }
+]

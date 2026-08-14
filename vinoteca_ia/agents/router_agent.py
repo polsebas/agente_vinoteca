@@ -1,39 +1,31 @@
-"""Agente Router: clasifica intención y deriva (sin Team).
+"""Agente Router: clasifica intención y emite `RouterOutput` (sin Team).
 
-Este agente emite un `RouterOutput` estructurado. En la topología real del
-sistema, el **ruteo efectivo** lo hace el Team (ver `router_team.py`) con
-`mode="route"` y el prompt `router_team_leader_v1.md`, que delega vía
-`delegate_task_to_member` sin exponer JSON al cliente.
-
-Este archivo expone además un agente router "puro" (solo clasifica, sin
-delegar) para debug, auditoría y pipelines offline que no levantan el Team.
+El ruteo productivo lo hace el Team (`router_team.py`). Este agente puro
+sirve para debug, auditoría y el orquestador PRAO.
 """
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from agno.agent import Agent
+from agno.models.base import Model
 
-from core.model_provider import get_resilient_model
+from agents.constitution import make_agent
 from schemas.agent_io import RouterOutput
 
-_PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "router_v1.md"
+ROUTER_TEMPERATURE = 0.0
 
 
-def _load_constitution() -> str:
-    return _PROMPT_PATH.read_text(encoding="utf-8")
-
-
-def crear_agente_router() -> Agent:
-    """Construye el agente Router "puro" (solo clasifica, no delega)."""
-    primary, fallbacks = get_resilient_model(temperature=0.0)
-    return Agent(
+def get_router_agent(model: Model | None = None) -> Agent:
+    """Factory Agno 2.5: Router a T=0.0 con `output_schema=RouterOutput`."""
+    return make_agent(
         name="agente_router",
-        model=primary,
-        fallback_models=fallbacks,
-        instructions=_load_constitution(),
+        description="Clasifica la intención del cliente en clases cerradas y deriva.",
+        prompt_file="router_v1.md",
+        temperature=ROUTER_TEMPERATURE,
+        model=model,
         output_schema=RouterOutput,
         tool_call_limit=1,
-        markdown=False,
     )
+
+
+crear_agente_router = get_router_agent

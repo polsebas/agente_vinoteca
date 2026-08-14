@@ -80,8 +80,11 @@ def test_app_combines_domain_and_agent_os_routes(patched_agents):
     assert "/health" in paths_base
     assert "/chat" in paths_base
     assert "/webhook" in paths_base
+    assert "/webhook/mercadopago" in paths_base
+    assert "/webhook/whatsapp" in paths_base
     assert "/pedido/{run_id}/aprobar" in paths_base
     assert "/admin/auditor/run" in paths_base
+    assert "/admin/metricas" in paths_base
 
     try:
         app = build_agent_os(base_app=base).get_app()
@@ -92,12 +95,8 @@ def test_app_combines_domain_and_agent_os_routes(patched_agents):
     assert "/health" in paths
     assert "/chat" in paths
     assert "/webhook" in paths
-    assert any(p.startswith("/agents") for p in paths), (
-        f"AgentOS debería exponer /agents: {paths}"
-    )
-    assert "/approvals" in paths or any(
-        p.startswith("/approvals") for p in paths
-    )
+    assert any(p.startswith("/agents") for p in paths), f"AgentOS debería exponer /agents: {paths}"
+    assert "/approvals" in paths or any(p.startswith("/approvals") for p in paths)
 
 
 def test_agent_os_routes_blocked_from_external_ip(patched_agents, monkeypatch):

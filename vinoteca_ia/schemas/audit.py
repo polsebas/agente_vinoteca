@@ -13,6 +13,67 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class ToolCallArgument(BaseModel):
+    """Argumento de tool serializado (clave/valor) sin dicts libres."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    clave: str
+    valor: str
+
+
+class ToolCallRecord(BaseModel):
+    """Proyección tipada de una invocación de tool en un run auditado."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tool_name: str | None = None
+    argumentos: list[ToolCallArgument] = Field(default_factory=list)
+    error: bool | None = None
+    confirmed: bool | None = None
+    requires_confirmation: bool | None = None
+
+
+class RunAuditable(BaseModel):
+    """Proyección mínima de un run para el juez."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: str
+    session_id: str
+    agente_nombre: str
+    user_id: str | None = None
+    input_usuario: str = Field(default="")
+    output_agente: str = Field(default="")
+    tool_calls: list[ToolCallRecord] = Field(default_factory=list)
+    created_at: datetime
+
+
+class RunsAuditablesResponse(BaseModel):
+    """Respuesta de `listar_runs_auditables`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ventana_desde: datetime
+    ventana_hasta: datetime
+    runs_devueltos: int
+    truncado: bool
+    runs: list[RunAuditable]
+
+    @property
+    def total(self) -> int:
+        """Alias de compatibilidad hacia atrás para consumidores antiguos."""
+        return self.runs_devueltos
+
+
+class AuditRequest(BaseModel):
+    """Parámetros del disparo manual del auditor."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    horas_atras: int = Field(default=24, ge=1, le=168)
+
+
 class AuditSeverity(StrEnum):
     """Gravedad del hallazgo ordenada por impacto de negocio."""
 
@@ -115,3 +176,19 @@ class AuditReport(BaseModel):
     @property
     def altas(self) -> int:
         return sum(1 for f in self.findings if f.severidad == AuditSeverity.ALTA)
+
+
+class AuditSummary(BaseModel):
+    """Resumen del job nocturno LLM-as-a-Judge."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    fecha: datetime
+    sessions_evaluadas: int = Field(ge=0)
+    aprobadas: int = Field(ge=0)
+    reprobadas: int = Field(ge=0)
+    alertas: int = Field(ge=0)
+    resultados: list[str] = Field(
+        default_factory=list,
+        description="session_id de cada corrida evaluada.",
+    )

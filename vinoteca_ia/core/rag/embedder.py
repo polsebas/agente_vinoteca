@@ -71,9 +71,7 @@ def _encode_sync(textos: list[str]) -> list[list[float]]:
         emb = F.normalize(emb, p=2, dim=1)
 
     if emb.shape[1] != _DIM:
-        raise ValueError(
-            f"Dimensión inesperada para embeddings: {emb.shape[1]} (esperada {_DIM})"
-        )
+        raise ValueError(f"Dimensión inesperada para embeddings: {emb.shape[1]} (esperada {_DIM})")
     return emb.cpu().tolist()
 
 

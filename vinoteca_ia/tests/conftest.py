@@ -47,3 +47,23 @@ def mock_pg_execute():
 def mock_pg_fetchval():
     with patch("storage.postgres.fetchval") as mock:
         yield mock
+
+
+@pytest.fixture(autouse=True)
+def reset_memgraph_engine():
+    """Aísla el singleton de MemGraphRAG entre tests."""
+    from core.rag.memgraph_adapter import set_engine
+
+    set_engine(None)
+    yield
+    set_engine(None)
+
+
+@pytest.fixture(autouse=True)
+def reset_observability_singletons():
+    """Evita que KPIs/costos in-process se filtren entre tests."""
+    from observability import reset_observability
+
+    reset_observability()
+    yield
+    reset_observability()

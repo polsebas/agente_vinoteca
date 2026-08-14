@@ -67,6 +67,75 @@ async def test_orquestador_deriva_a_sommelier_y_propaga_respuesta():
 
 
 @pytest.mark.asyncio
+async def test_flujo_triage_memgraphrag_recomendacion():
+    """Triage → retrieval MemGraphRAG → recomendación del sommelier."""
+    from core.rag.memgraph_adapter import (
+        build_engine,
+        ingest_fragment,
+        query_memgraph_rag,
+        set_engine,
+    )
+    from core.rag.wine_graph_schema import extract_wine_triples
+    from schemas.knowledge_fragment import CapaConocimiento, FuenteConocimiento, KnowledgeFragment
+
+    engine = build_engine()
+    set_engine(engine)
+    frag = KnowledgeFragment(
+        id="kf-flow-asado",
+        producto_id="achaval-malbec-2020",
+        capa=CapaConocimiento.TERRUNO,
+        fuente=FuenteConocimiento.SUMILLER,
+        contenido="Achaval Ferrer Malbec de Valle de Uco. Marida con asado de tira.",
+        validador_humano=True,
+        metadata={"region": "Valle de Uco", "maridaje": "asado"},
+    )
+    await ingest_fragment(frag, extract_wine_triples(frag), engine=engine)
+    hits = await query_memgraph_rag("malbec asado valle de uco", engine=engine)
+    assert hits, "MemGraphRAG debería devolver el fragmento de terroir/maridaje"
+
+    orch = object.__new__(Orchestrator)
+    mock_arun = AsyncMock(
+        return_value=MagicMock(
+            content="Con el asado te va Achaval Malbec de Valle de Uco; hay stock."
+        )
+    )
+    sommelier = MagicMock()
+    sommelier.arun = mock_arun
+    orch._agentes = {
+        "agente_inventario": MagicMock(),
+        "agente_sommelier": sommelier,
+        "agente_orders": MagicMock(),
+        "agente_support": MagicMock(),
+        "agente_events": MagicMock(),
+    }
+    orch._router = MagicMock()
+    orch._semantic = AsyncMock()
+    orch._semantic.get_profile = AsyncMock(return_value=None)
+    orch._episodic = AsyncMock()
+    orch._episodic.append_interaction = AsyncMock(return_value=None)
+    orch._episodic.get_pending_orders = AsyncMock(return_value=[])
+    orch._memories = {}
+    orch._states = {}
+    orch._last_calculated = {}
+
+    router_out = RouterOutput(
+        intencion=IntentClass.MARIDAJE,
+        confianza=0.94,
+        agente_destino=AgenteDestino.SOMMELIER,
+        razonamiento="test: asado → sommelier + grafo",
+    )
+    with patch.object(orch, "_clasificar", new_callable=AsyncMock, return_value=router_out):
+        resp = await orch.process_turn(
+            "sess_memgraph",
+            "¿Qué vino me recomendás para un asado?",
+        )
+
+    assert resp.agente == "agente_sommelier"
+    assert "Malbec" in resp.respuesta or "asado" in resp.respuesta.lower()
+    mock_arun.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_consultar_stock_cero_no_disponible():
     """La tool SQL marca `disponible=False` cuando la fila tiene cantidad 0."""
     vino_id = uuid.uuid4()

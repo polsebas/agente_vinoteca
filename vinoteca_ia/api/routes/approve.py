@@ -17,22 +17,16 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
 
 from agents.router_team import crear_router_team
 from api.deps import approval_rate_limiter, require_approval_token
+from observability.alerts import get_alert_manager
+from observability.metrics import get_kpi_collector
+from schemas.api import ApproveRequest
 
 logger = logging.getLogger("vinoteca.api.approve")
 
 router = APIRouter(tags=["orders"])
-
-
-class ApproveRequest(BaseModel):
-    """Decisión explícita del aprobador."""
-
-    aprobar: bool = Field(..., description="True para continuar, False para rechazar.")
-    session_id: str = Field(..., description="Session_id original del chat.")
-    nota: str | None = Field(default=None, description="Nota del aprobador.")
 
 
 @router.post(
@@ -75,6 +69,16 @@ async def aprobar_pedido(run_id: str, req: ApproveRequest) -> dict:
 
     content = getattr(final, "content", None)
     payload = content.model_dump() if hasattr(content, "model_dump") else str(content)
+    get_kpi_collector().record_hitl(req.session_id, approved=req.aprobar)
+    get_alert_manager().trigger_alert(
+        level="info",
+        category="hitl",
+        message=(
+            f"Pedido {run_id} {'aprobado' if req.aprobar else 'rechazado'} "
+            f"en sesión {req.session_id}"
+        ),
+        metadata={"run_id": run_id, "session_id": req.session_id, "aprobado": req.aprobar},
+    )
     return {
         "run_id": run_id,
         "session_id": req.session_id,

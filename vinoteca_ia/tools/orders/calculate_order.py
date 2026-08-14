@@ -1,91 +1,137 @@
-"""Cálculo determinista de totales (sin LLM)."""
+"""Cálculo determinista de totales (Fase 1 del 2PC). No muta la DB."""
 
 from __future__ import annotations
 
 from decimal import Decimal
-from uuid import UUID
 
 from agno.tools import tool
 
-from schemas.tool_responses import CalculationResponse, ResultadoTool
+from schemas.order import CalculatedOrder, LineaPedidoSolicitud, OrderLineItem, TipoEntrega
+from schemas.tool_responses import CalculatedOrderResponse, ResultadoTool
 from storage.postgres import fetch_all
+
+COSTO_ENVIO = Decimal("2500.00")
+UMBRAL_ENVIO_GRATIS = Decimal("30000.00")
+DESCUENTO_6 = Decimal("0.05")
+DESCUENTO_12 = Decimal("0.10")
+
+# Alias histórico.
+CalculationResponse = CalculatedOrderResponse
+
+
+def _parse_lineas(lineas: list) -> list[LineaPedidoSolicitud] | str:
+    if not lineas:
+        return "Debe proveer al menos una línea."
+    try:
+        parsed: list[LineaPedidoSolicitud] = []
+        for line in lineas:
+            if isinstance(line, LineaPedidoSolicitud):
+                parsed.append(line)
+            else:
+                parsed.append(LineaPedidoSolicitud.model_validate(line))
+        return parsed
+    except (KeyError, ValueError, TypeError) as exc:
+        return f"Líneas mal formadas: {exc}"
+
+
+def _descuento_volumen(botellas: int, subtotal: Decimal) -> Decimal:
+    if botellas >= 12:
+        return (subtotal * DESCUENTO_12).quantize(Decimal("0.01"))
+    if botellas >= 6:
+        return (subtotal * DESCUENTO_6).quantize(Decimal("0.01"))
+    return Decimal("0.00")
 
 
 @tool
 async def calcular_orden(
-    lineas: list[dict[str, str | int]],
-    costo_envio_ars: float = 0.0,
-) -> CalculationResponse:
-    """Calcular subtotal, envío y total de un pedido usando precios actuales de SQL.
+    lineas: list[LineaPedidoSolicitud],
+    tipo_entrega: TipoEntrega = TipoEntrega.ENVIO_DOMICILIO,
+    codigo_postal: str | None = None,
+    costo_envio_ars: float | None = None,
+) -> CalculatedOrderResponse:
+    """Calcular subtotal, descuento por volumen y envío con precios SQL.
 
-    Usá esta tool como segundo paso del armado de un pedido, después de
-    `verificar_stock_exacto` y antes de `crear_orden`. El cálculo es puramente
-    aritmético: NUNCA dejes que el LLM sume precios por su cuenta.
-
-    Los precios se toman autoritativamente de la tabla `vinos`: si cambiaron
-    entre el momento de la recomendación y el armado, el total se recalcula
-    con los vigentes.
+    Segundo paso del 2PC, después de `verificar_stock_exacto`. NUNCA dejes
+    que el LLM sume. Envío gratis si el subtotal (post-descuento) supera
+    $30.000 ARS. Retiro en local = envío $0.
 
     Args:
-        lineas: Lista de `{"vino_id": "<uuid>", "cantidad": <int>}`.
-        costo_envio_ars: Costo de envío a agregar al subtotal.
-
-    Returns:
-        CalculationResponse con `subtotal_ars`, `envio_ars`, `total_ars`.
+        lineas: `producto_id`/`vino_id` + `cantidad`.
+        tipo_entrega: domicilio o retiro.
+        codigo_postal: usado solo para trazar zona; el costo lo define umbral/retiro.
+        costo_envio_ars: override explícito (se ignora en retiro o envío gratis).
     """
-    if not lineas:
-        return CalculationResponse(
-            resultado=ResultadoTool.ERROR,
-            subtotal_ars=Decimal("0"),
-            envio_ars=Decimal("0"),
-            total_ars=Decimal("0"),
-            mensaje="Debe proveer al menos una línea.",
-        )
+    parsed = _parse_lineas(lineas)
+    if isinstance(parsed, str):
+        return CalculatedOrderResponse(resultado=ResultadoTool.ERROR, mensaje=parsed)
 
-    try:
-        requested: dict[UUID, int] = {
-            UUID(str(line["vino_id"])): int(line["cantidad"])
-            for line in lineas
-        }
-    except (KeyError, ValueError) as exc:
-        return CalculationResponse(
-            resultado=ResultadoTool.ERROR,
-            subtotal_ars=Decimal("0"),
-            envio_ars=Decimal("0"),
-            total_ars=Decimal("0"),
-            mensaje=f"Líneas mal formadas: {exc}",
-        )
+    requested: dict[str, int] = {}
+    for sol in parsed:
+        requested[sol.producto_id] = requested.get(sol.producto_id, 0) + sol.cantidad
 
-    placeholders = ", ".join(f"${i + 1}" for i in range(len(requested)))
+    ids = list(requested.keys())
+    placeholders = ", ".join(f"${i + 1}" for i in range(len(ids)))
     rows = await fetch_all(
         f"""
-        SELECT id, precio_ars
+        SELECT id::text AS id, nombre, precio, activo
         FROM vinos
-        WHERE id IN ({placeholders}) AND activo = TRUE
+        WHERE id IN ({placeholders})
         """,
-        *requested.keys(),
+        *ids,
     )
+    por_id = {str(r["id"]): r for r in rows}
 
-    precios: dict[UUID, Decimal] = {row["id"]: row["precio_ars"] for row in rows}
-    if len(precios) != len(requested):
-        return CalculationResponse(
-            resultado=ResultadoTool.ERROR,
-            subtotal_ars=Decimal("0"),
-            envio_ars=Decimal("0"),
-            total_ars=Decimal("0"),
-            mensaje="Uno o más vinos no existen o están inactivos.",
+    lineas_calc: list[OrderLineItem] = []
+    subtotal = Decimal("0")
+    botellas = 0
+    for pid, cantidad in requested.items():
+        row = por_id.get(pid)
+        if row is None or not row["activo"]:
+            return CalculatedOrderResponse(
+                resultado=ResultadoTool.ERROR,
+                mensaje=f"Producto {pid} inexistente o inactivo.",
+            )
+        precio = row["precio"]
+        if precio is None or Decimal(str(precio)) <= 0:
+            return CalculatedOrderResponse(
+                resultado=ResultadoTool.ERROR,
+                mensaje=f"Precio inválido para {pid}.",
+            )
+        precio_u = Decimal(str(precio)).quantize(Decimal("0.01"))
+        sub = (precio_u * Decimal(cantidad)).quantize(Decimal("0.01"))
+        subtotal += sub
+        botellas += cantidad
+        lineas_calc.append(
+            OrderLineItem(
+                producto_id=pid,
+                nombre=row["nombre"] or pid,
+                cantidad=cantidad,
+                precio_unitario=precio_u,
+                subtotal=sub,
+            )
         )
 
-    subtotal = sum(
-        (precios[vid] * Decimal(cantidad) for vid, cantidad in requested.items()),
-        start=Decimal("0"),
-    )
-    envio = Decimal(str(costo_envio_ars))
-    total = subtotal + envio
+    descuento = _descuento_volumen(botellas, subtotal)
+    base_envio = subtotal - descuento
+    if tipo_entrega == TipoEntrega.RETIRO_LOCAL or base_envio >= UMBRAL_ENVIO_GRATIS:
+        envio = Decimal("0.00")
+    elif costo_envio_ars is not None:
+        envio = Decimal(str(costo_envio_ars)).quantize(Decimal("0.01"))
+    else:
+        envio = COSTO_ENVIO
 
-    return CalculationResponse(
-        resultado=ResultadoTool.OK,
-        subtotal_ars=subtotal.quantize(Decimal("0.01")),
-        envio_ars=envio.quantize(Decimal("0.01")),
-        total_ars=total.quantize(Decimal("0.01")),
+    total = (base_envio + envio).quantize(Decimal("0.01"))
+    order = CalculatedOrder(
+        lineas=lineas_calc,
+        subtotal=subtotal.quantize(Decimal("0.01")),
+        descuento=descuento,
+        costo_envio=envio,
+        total=total,
+        tipo_entrega=tipo_entrega,
+        requiere_confirmacion=True,
     )
+    _ = codigo_postal  # zona se evalúa en consultar_zona_entrega
+    return CalculatedOrderResponse(resultado=ResultadoTool.OK, order=order)
+
+
+calcular_pedido = calcular_orden

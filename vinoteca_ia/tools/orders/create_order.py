@@ -1,224 +1,300 @@
-"""Creación de orden (Fase 1 del Two-Phase Commit).
-
-Esta es una tool MUTATIVA: pasa el agente a estado "requiere confirmación"
-antes de ejecutarse. El agente devolverá la respuesta, el servidor pausará
-el run, y solo tras `/pedido/{id}/aprobar` el run se reanuda con
-`acontinue_run()` para invocar `enviar_link_pago`.
-"""
+"""Creación de orden (Fase 2 del 2PC). Mutación atómica + log inmutable."""
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from decimal import Decimal
-from uuid import UUID, uuid4
+from uuid import uuid4
 
+import asyncpg
 from agno.tools import tool
 
 from core.idempotency import IdempotencyManager
-from schemas.order import Order, OrderLine
+from schemas.order import (
+    ConfirmedOrder,
+    LineaPedidoSolicitud,
+    OrderLineItem,
+    TipoEntrega,
+)
 from schemas.tool_responses import CreateOrderResponse, ResultadoTool
+from storage.immutable_log import log_transaction_event
 from storage.postgres import get_pool
+from tools.orders.calculate_order import COSTO_ENVIO, UMBRAL_ENVIO_GRATIS, _descuento_volumen
+
+
+def _parse_lineas(lineas: list) -> list[LineaPedidoSolicitud] | str:
+    if not lineas:
+        return "Debe proveer al menos una línea."
+    try:
+        parsed: list[LineaPedidoSolicitud] = []
+        for line in lineas:
+            if isinstance(line, LineaPedidoSolicitud):
+                parsed.append(line)
+            else:
+                parsed.append(LineaPedidoSolicitud.model_validate(line))
+        return parsed
+    except (KeyError, ValueError, TypeError) as exc:
+        return f"Líneas mal formadas: {exc}"
 
 
 @tool(requires_confirmation=True)
 async def crear_orden(
     session_id: str,
     cliente_id: str | None,
-    lineas: list[dict[str, str | int]],
+    lineas: list[LineaPedidoSolicitud],
     costo_envio_ars: float = 0.0,
+    tipo_entrega: TipoEntrega = TipoEntrega.ENVIO_DOMICILIO,
+    idempotency_key: str | None = None,
 ) -> CreateOrderResponse:
-    """Persistir un pedido en estado PREPARADA. Requiere confirmación explícita.
+    """Persistir el pedido, descontar stock y loguear. Requiere HitL.
 
-    Usá esta tool SOLO después de que:
-    1. `verificar_stock_exacto` haya devuelto `todos_disponibles=True`.
-    2. `calcular_orden` haya devuelto un total coherente.
-    3. El cliente haya visto el resumen completo y dicho "sí" textualmente.
-
-    Esta tool tiene `requires_confirmation=True`: el framework pausará el
-    run antes de ejecutarla y lo reanudará solo tras la aprobación humana.
-    NO la uses para "pedir confirmación al cliente" — pedir confirmación
-    es parte del mensaje natural del agente; esta tool ES la ejecución.
-
-    La idempotencia se calcula sobre (session_id, cliente_id, lineas) para
-    que si el cliente vuelve a pedir "ok confirmá", no se cree una orden
-    duplicada.
+    Último paso del 2PC, solo después de `verificar_stock_exacto` + `calcular_orden`
+    y confirmación explícita. Idempotente: Redis + UNIQUE `idempotency_key`.
 
     Args:
-        session_id: ID de la sesión de conversación.
-        cliente_id: ID del cliente registrado (puede ser None para invitados).
-        lineas: Lista de `{"vino_id": "<uuid>", "cantidad": <int>}`.
-        costo_envio_ars: Costo de envío en ARS.
-
-    Returns:
-        CreateOrderResponse con la Order creada en estado PREPARADA.
+        session_id: sesión de chat.
+        cliente_id: cliente registrado o None (invitado).
+        lineas: producto_id + cantidad.
+        costo_envio_ars: costo de envío ya calculado (0 = retiro o umbral).
+        tipo_entrega: domicilio o retiro.
+        idempotency_key: si viene vacía se deriva de sesión+líneas.
     """
-    if not lineas:
-        return CreateOrderResponse(
-            resultado=ResultadoTool.ERROR,
-            mensaje="Debe proveer al menos una línea.",
-        )
+    parsed = _parse_lineas(lineas)
+    if isinstance(parsed, str):
+        return CreateOrderResponse(resultado=ResultadoTool.ERROR, mensaje=parsed)
 
-    try:
-        items: list[tuple[UUID, int]] = [
-            (UUID(str(line["vino_id"])), int(line["cantidad"]))
-            for line in lineas
-        ]
-    except (KeyError, ValueError) as exc:
-        return CreateOrderResponse(
-            resultado=ResultadoTool.ERROR,
-            mensaje=f"Líneas mal formadas: {exc}",
-        )
-
+    items = [(sol.producto_id, sol.cantidad) for sol in parsed]
     idem = IdempotencyManager()
-    idem_key = IdempotencyManager.build_key(
+    idem_key = idempotency_key or IdempotencyManager.build_key(
         "crear_orden",
         session_id,
         cliente_id or "invitado",
-        "|".join(f"{vid}:{q}" for vid, q in items),
+        "|".join(f"{pid}:{q}" for pid, q in items),
     )
-    cached = await idem.get(idem_key)
-    if cached and cached.status == "ok":
-        return CreateOrderResponse.model_validate_json(cached.resultado_json)
-
-    now = datetime.now(UTC)
-    vino_ids = [vid for vid, _ in items]
+    try:
+        cached = await idem.get(idem_key)
+        if cached and cached.status == "ok":
+            return CreateOrderResponse.model_validate_json(cached.resultado_json)
+    except Exception:
+        cached = None
 
     pool = await get_pool()
-    async with pool.acquire() as conn:
-        async with conn.transaction():
-            rows = await conn.fetch(
-                """
-                SELECT id, nombre, precio_ars
-                FROM vinos
-                WHERE id = ANY($1::uuid[]) AND activo = TRUE
-                """,
-                vino_ids,
-            )
-            por_id = {row["id"]: row for row in rows}
-            if len(por_id) != len(items):
-                return CreateOrderResponse(
-                    resultado=ResultadoTool.ERROR,
-                    mensaje="Uno o más vinos no existen o están inactivos.",
+    try:
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                existing = await conn.fetchrow(
+                    "SELECT id FROM pedidos WHERE idempotency_key = $1",
+                    idem_key,
                 )
+                if existing is not None:
+                    return await _rehidratar(conn, str(existing["id"]))
 
-            reservas_rows = await conn.fetch(
-                """
-                SELECT reserva_id, vino_id, cantidad, expira_en
-                FROM stock_reservas
-                WHERE session_id = $1
-                  AND vino_id = ANY($2::uuid[])
-                  AND estado = 'activa'
-                  AND expira_en > $3
-                FOR UPDATE
-                """,
-                session_id,
-                vino_ids,
-                now,
-            )
-            reservado_por_vino: dict[UUID, int] = {}
-            for r in reservas_rows:
-                reservado_por_vino[r["vino_id"]] = (
-                    reservado_por_vino.get(r["vino_id"], 0) + int(r["cantidad"])
+                ids = [pid for pid, _ in items]
+                rows = await conn.fetch(
+                    """
+                    SELECT id::text AS id, nombre, precio, activo
+                    FROM vinos
+                    WHERE id = ANY($1::text[])
+                    """,
+                    ids,
                 )
-
-            faltantes = [
-                vid for vid, qty in items if reservado_por_vino.get(vid, 0) < qty
-            ]
-            if faltantes:
-                return CreateOrderResponse(
-                    resultado=ResultadoTool.ERROR,
-                    mensaje=(
-                        "Las reservas de stock expiraron o no alcanzan. "
-                        "Volvé a correr `verificar_stock_exacto` antes de crear la orden."
-                    ),
-                )
-
-            lineas_orden: list[OrderLine] = []
-            subtotal = Decimal("0")
-            for vino_id, cantidad in items:
-                row = por_id[vino_id]
-                subtotal_linea = row["precio_ars"] * Decimal(cantidad)
-                subtotal += subtotal_linea
-                lineas_orden.append(
-                    OrderLine(
-                        vino_id=vino_id,
-                        nombre_vino=row["nombre"],
-                        cantidad=cantidad,
-                        precio_unitario_ars=row["precio_ars"],
-                        subtotal_ars=subtotal_linea.quantize(Decimal("0.01")),
+                por_id = {str(r["id"]): r for r in rows}
+                if len(por_id) != len(set(ids)):
+                    return CreateOrderResponse(
+                        resultado=ResultadoTool.ERROR,
+                        mensaje="Uno o más vinos no existen.",
                     )
+
+                stock_rows = await conn.fetch(
+                    """
+                    SELECT producto_id,
+                           COALESCE(cantidad_disponible, 0) AS cantidad_disponible,
+                           COALESCE(reservado, 0) AS reservado
+                    FROM stock
+                    WHERE producto_id = ANY($1::text[])
+                    FOR UPDATE
+                    """,
+                    ids,
                 )
+                stock_map = {str(r["producto_id"]): r for r in stock_rows}
+                for pid, cantidad in items:
+                    st = stock_map.get(pid)
+                    disponible = 0
+                    if st is not None:
+                        disponible = int(st["cantidad_disponible"]) - int(st["reservado"])
+                    if disponible < cantidad:
+                        return CreateOrderResponse(
+                            resultado=ResultadoTool.ERROR,
+                            mensaje=f"Stock insuficiente al confirmar {pid}.",
+                        )
 
-            envio = Decimal(str(costo_envio_ars)).quantize(Decimal("0.01"))
-            total = (subtotal + envio).quantize(Decimal("0.01"))
-            order_id = uuid4()
-            order = Order(
-                order_id=order_id,
-                session_id=session_id,
-                cliente_id=cliente_id,
-                idempotency_key=idem_key,
-                lineas=lineas_orden,
-                subtotal_ars=subtotal.quantize(Decimal("0.01")),
-                envio_ars=envio,
-                total_ars=total,
-            )
+                lineas_orden: list[OrderLineItem] = []
+                subtotal = Decimal("0")
+                botellas = 0
+                for pid, cantidad in items:
+                    row = por_id[pid]
+                    precio_raw = row["precio"]
+                    if not row["activo"] or precio_raw is None or Decimal(str(precio_raw)) <= 0:
+                        return CreateOrderResponse(
+                            resultado=ResultadoTool.ERROR,
+                            mensaje=f"Producto {pid} inactivo o sin precio válido.",
+                        )
+                    precio_u = Decimal(str(row["precio"])).quantize(Decimal("0.01"))
+                    sub = (precio_u * Decimal(cantidad)).quantize(Decimal("0.01"))
+                    subtotal += sub
+                    botellas += cantidad
+                    lineas_orden.append(
+                        OrderLineItem(
+                            producto_id=pid,
+                            nombre=row["nombre"] or pid,
+                            cantidad=cantidad,
+                            precio_unitario=precio_u,
+                            subtotal=sub,
+                        )
+                    )
 
-            await conn.execute(
-                """
-                INSERT INTO pedidos (
-                    id, session_id, cliente_id, idempotency_key,
-                    subtotal_ars, envio_ars, total_ars, estado, created_at
-                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8, NOW())
-                """,
-                order.order_id,
-                order.session_id,
-                order.cliente_id,
-                order.idempotency_key,
-                order.subtotal_ars,
-                order.envio_ars,
-                order.total_ars,
-                order.estado.value,
-            )
-            for linea in lineas_orden:
+                descuento = _descuento_volumen(botellas, subtotal)
+                base = subtotal - descuento
+                if tipo_entrega == TipoEntrega.RETIRO_LOCAL or base >= UMBRAL_ENVIO_GRATIS:
+                    envio = Decimal("0.00")
+                else:
+                    envio = Decimal(str(costo_envio_ars or COSTO_ENVIO)).quantize(Decimal("0.01"))
+                total = (base + envio).quantize(Decimal("0.01"))
+                order_id = f"PED-{uuid4().hex[:8]}"
+
+                for pid, cantidad in items:
+                    result = await conn.execute(
+                        """
+                        UPDATE stock
+                        SET cantidad_disponible = cantidad_disponible - $1,
+                            reservado = reservado + $1,
+                            updated_at = NOW()
+                        WHERE producto_id = $2
+                          AND (cantidad_disponible - COALESCE(reservado, 0)) >= $1
+                        """,
+                        cantidad,
+                        pid,
+                    )
+                    if not str(result).endswith(" 1"):
+                        return CreateOrderResponse(
+                            resultado=ResultadoTool.ERROR,
+                            mensaje=f"Stock insuficiente al confirmar {pid}.",
+                        )
+
                 await conn.execute(
                     """
-                    INSERT INTO pedido_lineas (
-                        pedido_id, vino_id, cantidad,
-                        precio_unitario_ars, subtotal_ars
-                    ) VALUES ($1,$2,$3,$4,$5)
+                    INSERT INTO pedidos (
+                        id, session_id, cliente_id, estado, total, subtotal,
+                        descuento, costo_envio, tipo_entrega, idempotency_key, created_at
+                    ) VALUES ($1,$2,$3,'aprobada',$4,$5,$6,$7,$8,$9, NOW())
                     """,
-                    order.order_id,
-                    linea.vino_id,
-                    linea.cantidad,
-                    linea.precio_unitario_ars,
-                    linea.subtotal_ars,
+                    order_id,
+                    session_id,
+                    cliente_id,
+                    total,
+                    subtotal,
+                    descuento,
+                    envio,
+                    tipo_entrega.value,
+                    idem_key,
                 )
-
-            await conn.execute(
-                """
-                UPDATE stock_reservas
-                SET estado = 'consumida', consumida_en = $1
-                WHERE session_id = $2 AND estado = 'activa'
-                """,
-                now,
-                session_id,
-            )
-
-            for vino_id, cantidad in items:
-                result = await conn.execute(
-                    """
-                    UPDATE stock
-                    SET cantidad = cantidad - $1
-                    WHERE vino_id = $2 AND cantidad >= $1
-                    """,
-                    cantidad,
-                    vino_id,
-                )
-                if not result.endswith(" 1"):
-                    raise RuntimeError(
-                        f"Stock físico insuficiente al consumar reserva del vino {vino_id}"
+                for linea in lineas_orden:
+                    await conn.execute(
+                        """
+                        INSERT INTO pedido_lineas (
+                            pedido_id, producto_id, nombre, cantidad,
+                            precio_unitario, subtotal
+                        ) VALUES ($1,$2,$3,$4,$5,$6)
+                        """,
+                        order_id,
+                        linea.producto_id,
+                        linea.nombre,
+                        linea.cantidad,
+                        linea.precio_unitario,
+                        linea.subtotal,
                     )
 
+                order = ConfirmedOrder(
+                    id=order_id,
+                    session_id=session_id,
+                    cliente_id=cliente_id,
+                    lineas=lineas_orden,
+                    total=total,
+                    tipo_entrega=tipo_entrega,
+                    idempotency_key=idem_key,
+                )
+    except asyncpg.UniqueViolationError:
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT id FROM pedidos WHERE idempotency_key = $1",
+                idem_key,
+            )
+            if row:
+                return await _rehidratar(conn, str(row["id"]))
+        return CreateOrderResponse(
+            resultado=ResultadoTool.ERROR,
+            mensaje="Conflicto de idempotencia sin pedido recuperable.",
+        )
+
+    await log_transaction_event(
+        session_id=session_id,
+        accion="crear_orden",
+        payload=order,
+        idempotency_key=idem_key,
+        resultado="ok",
+        metadata={"pedido_id": order.id},
+    )
     response = CreateOrderResponse(resultado=ResultadoTool.OK, order=order)
-    await idem.put(idem_key, response.model_dump_json(), status="ok")
+    try:
+        await idem.put(idem_key, response.model_dump_json(), status="ok")
+    except Exception:
+        pass
     return response
+
+
+async def _rehidratar(conn, pedido_id: str) -> CreateOrderResponse:
+    cab = await conn.fetchrow(
+        """
+        SELECT id, session_id, cliente_id, total, tipo_entrega, idempotency_key, payment_link
+        FROM pedidos WHERE id = $1
+        """,
+        pedido_id,
+    )
+    if cab is None:
+        return CreateOrderResponse(
+            resultado=ResultadoTool.ERROR,
+            mensaje="Pedido idempotente no recuperable.",
+        )
+    lineas_rows = await conn.fetch(
+        """
+        SELECT producto_id, nombre, cantidad, precio_unitario, subtotal
+        FROM pedido_lineas WHERE pedido_id = $1
+        """,
+        pedido_id,
+    )
+    tipo = TipoEntrega.ENVIO_DOMICILIO
+    try:
+        if cab["tipo_entrega"]:
+            tipo = TipoEntrega(cab["tipo_entrega"])
+    except ValueError:
+        pass
+    order = ConfirmedOrder(
+        id=str(cab["id"]),
+        session_id=cab["session_id"] or "",
+        cliente_id=cab["cliente_id"],
+        lineas=[
+            OrderLineItem(
+                producto_id=str(r["producto_id"]),
+                nombre=r["nombre"] or "",
+                cantidad=int(r["cantidad"]),
+                precio_unitario=Decimal(str(r["precio_unitario"])),
+                subtotal=Decimal(str(r["subtotal"])),
+            )
+            for r in lineas_rows
+        ],
+        total=Decimal(str(cab["total"])),
+        tipo_entrega=tipo,
+        idempotency_key=cab["idempotency_key"] or "",
+        payment_link=cab["payment_link"],
+    )
+    return CreateOrderResponse(resultado=ResultadoTool.OK, order=order, mensaje="idempotent_replay")
