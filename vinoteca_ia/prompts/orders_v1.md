@@ -25,14 +25,14 @@ Orden obligatorio de tools:
 1. `verificar_stock_exacto` — solo lectura:
    `cantidad_disponible - reservado >= cantidad`. Si falta stock, cortá.
 2. `calcular_orden` — subtotal, descuento por volumen (6/12 botellas),
-   envío (gratis si subtotal post-descuento > $30.000 ARS; retiro = $0).
+   envío (gratis si subtotal post-descuento ≥ $30.000 ARS; retiro = $0).
 3. Presentá el resumen y preguntá textualmente: **"¿Confirmás el pedido?"**
 4. `OrderResponse.requiere_aprobacion = true`, `order_id = null`,
    `payment_link = null`. **PAUSÁ**. No invoques `crear_orden`.
 
 `verificar_stock_exacto` y `calcular_orden` **NO escriben** en la base.
 
-### Fase 2 — Ejecución (solo tras "confirmo" / `/aprobar`)
+### Fase 2 — Ejecución (solo tras "confirmo" / `POST /pedido/{run_id}/aprobar`)
 
 1. `crear_orden` con `idempotency_key` (la tool la deriva si no viene).
    Reserva stock en transacción, inserta `pedidos` + `pedido_lineas`,
@@ -55,7 +55,7 @@ Las tools `crear_orden` y `enviar_link_pago` tienen
 
 ### Turno N+1 (Fase 2)
 
-1. El cliente dijo "confirmo" o el run se reanudó vía `/aprobar`.
+1. El cliente dijo "confirmo" (camino PRAO/`POST /chat`) o el run del Team se reanudó vía `POST /pedido/{run_id}/aprobar`.
 2. `crear_orden(..., idempotency_key=...)`.
 3. `enviar_link_pago(order_id)`.
 4. "¡Listo! Tu pedido quedó confirmado. Pagá acá: {link} (vence en 30 min)."

@@ -1,20 +1,18 @@
 # Vinoteca IA (paquete)
 
-El README completo del proyecto está en la raíz del repositorio:
-
-**[→ README principal](../README.md)**
-
-Desde esta carpeta (`vinoteca_ia/`) instalás dependencias, corrés tests y levantás la API:
+README completo: **[../README.md](../README.md)**  
+Guías: **[../docs/](../docs/)**
 
 ```bash
-python3 -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
+cd vinoteca_ia
+uv sync
 cp .env.example .env
 docker compose up -d
-python scripts/ensure_database.py
-uvicorn api.main:app --reload
+uv run python storage/migrations.py
+uv run python scripts/seed_catalog.py
+uv run uvicorn api.main:app --host 127.0.0.1 --port 8001 --reload
 ```
 
-Con `docker compose`, la primera vez que arranca el volumen Postgres ya se crean usuario, contraseña y base (`POSTGRES_DB` en `docker-compose.yml`). El script `ensure_database.py` sirve si usás otro Postgres o si la base del `DATABASE_URL` todavía no existe en el cluster.
+`ensure_database.py` solo hace falta si usás un Postgres que no creó `vinoteca_db`.
 
-**Agent UI (chat con AgentOS sin os.agno.com):** [doc Agno — AgentUI](https://docs.agno.com/other/agent-ui). `npx create-agent-ui@latest`, `npm run dev` en `localhost:3000`, y en el lateral la base de tu API (`http://127.0.0.1:8000` si usás el puerto del README raíz).
+Agent UI: [docs Agno](https://docs.agno.com/other/agent-ui) → endpoint `http://127.0.0.1:8001`.
